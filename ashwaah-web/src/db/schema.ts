@@ -13,7 +13,7 @@ export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description"),
-  mrp: real("mrp"),
+  basePrice: real("base_price").notNull(),
   salePrice: real("sale_price"),
   avgRating: real("avg_rating").default(4.3),
   numReviews: integer("num_reviews").default(1),

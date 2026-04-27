@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       id: products.id,
       name: products.name,
       description: products.description,
-      mrp: products.mrp,
+      basePrice: products.basePrice,
       salePrice: products.salePrice,
       images: products.images,
       avgRating: products.avgRating,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { 
-      name, description, mrp, salePrice, images, variations,
+      name, description, salePrice, images, variations,
       avgRating, numReviews, category, gender, colors, tags, isFeatured
     } = body;
 
@@ -74,44 +74,46 @@ export async function POST(request: Request) {
     
     // Pricing is now handled per variation. 
     // We will calculate a "base price" for the main product entry from the minimum variation price.
-    const baseMrp = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => parseFloat(v.mrp) || 0)) : 0;
-    const baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => parseFloat(v.salePrice) || 0)) : 0;
+    const basePriceValue = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.basePrice) || 0)) : 0;
+    const baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.salePrice) || 0)) : 0;
 
-    // 1. Insert Product
-    const productResult = await db.insert(products).values({
-      name,
-      description: description || null,
-      mrp: baseMrp,
-      salePrice: baseSalePrice,
-      images: JSON.stringify(images || []),
-      colors: JSON.stringify(colors || []),
-      avgRating: parseFloat(avgRating && avgRating.toString().trim() !== "" ? avgRating : "4.3"),
-      numReviews: parseInt(numReviews && numReviews.toString().trim() !== "" ? numReviews : "1"),
-      category: category || null,
-      gender: (gender as "men" | "women" | "unisex") || "unisex",
-      tags: tags || null,
-      isFeatured: !!isFeatured,
-    }).returning();
+    // 1 & 2. Insert Product and Variations in a Transaction
+    const newProduct = db.transaction((tx) => {
+      const productResult = tx.insert(products).values({
+        name,
+        description: description || null,
+        basePrice: basePriceValue,
+        salePrice: baseSalePrice,
+        images: JSON.stringify(images || []),
+        colors: JSON.stringify(colors || []),
+        avgRating: !isNaN(parseFloat(avgRating)) ? parseFloat(avgRating) : 4.3,
+        numReviews: !isNaN(parseInt(numReviews)) ? parseInt(numReviews) : 1,
+        category: category || null,
+        gender: (gender as "men" | "women" | "unisex") || "unisex",
+        tags: tags || null,
+        isFeatured: !!isFeatured,
+      }).returning().all();
 
-    if (!productResult || productResult.length === 0) {
-      throw new Error("Database failed to return the new product ID.");
-    }
+      if (!productResult || productResult.length === 0) {
+        throw new Error("Database failed to return the new product ID.");
+      }
 
-    const newProduct = productResult[0];
+      const insertedProduct = productResult[0];
 
-    // 2. Insert Variations
-    if (variations && variations.length > 0) {
-      const variationValues = variations.map((v: any) => ({
-        productId: newProduct.id,
-        size: v.size,
-        color: v.color || "Default",
-        stock: parseInt(v.stock) || 0,
-        mrp: parseFloat(v.mrp) || 0,
-        salePrice: parseFloat(v.salePrice) || 0,
-        sku: v.sku || `${newProduct.id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
-      }));
-      await db.insert(productVariations).values(variationValues);
-    }
+      if (variations && variations.length > 0) {
+        const variationValues = variations.map((v: any) => ({
+          productId: insertedProduct.id,
+          size: v.size,
+          color: v.color || "Default",
+          stock: parseInt(v.stock) || 0,
+          basePrice: Number(v.basePrice) || 0,
+          salePrice: Number(v.salePrice) || 0,
+          sku: v.sku || `${insertedProduct.id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
+        }));
+        tx.insert(productVariations).values(variationValues).run();
+      }
+      return insertedProduct;
+    });
 
     return NextResponse.json({ success: true, data: newProduct });
 
@@ -133,48 +135,49 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const { 
-      id, name, description, mrp, salePrice, images, variations,
+      id, name, description, salePrice, images, variations,
       avgRating, numReviews, category, gender, colors, tags, isFeatured
     } = body;
 
     if (!id) return NextResponse.json({ success: false, error: "ID is required" }, { status: 400 });
 
     // Pricing from variations
-    const baseMrp = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => parseFloat(v.mrp) || 0)) : 0;
-    const baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => parseFloat(v.salePrice) || 0)) : 0;
+    const basePriceValue = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.basePrice) || 0)) : 0;
+    const baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.salePrice) || 0)) : 0;
 
-    // 1. Update Product
-    await db.update(products).set({
-      name,
-      description: description || null,
-      mrp: baseMrp,
-      salePrice: baseSalePrice,
-      images: JSON.stringify(images || []),
-      colors: JSON.stringify(colors || []),
-      avgRating: parseFloat(avgRating && avgRating.toString().trim() !== "" ? avgRating : "4.3"),
-      numReviews: parseInt(numReviews && numReviews.toString().trim() !== "" ? numReviews : "1"),
-      category: category || null,
-      gender: gender || "unisex",
-      tags: tags || null,
-      isFeatured: !!isFeatured,
-    }).where(eq(products.id, id));
+    // 1 & 2. Update Product and Variations in a Transaction
+    db.transaction((tx) => {
+      tx.update(products).set({
+        name,
+        description: description || null,
+        basePrice: basePriceValue,
+        salePrice: baseSalePrice,
+        images: JSON.stringify(images || []),
+        colors: JSON.stringify(colors || []),
+        avgRating: !isNaN(parseFloat(avgRating)) ? parseFloat(avgRating) : 4.3,
+        numReviews: !isNaN(parseInt(numReviews)) ? parseInt(numReviews) : 1,
+        category: category || null,
+        gender: gender || "unisex",
+        tags: tags || null,
+        isFeatured: !!isFeatured,
+      }).where(eq(products.id, id)).run();
 
-    // 2. Update Variations
-    if (variations) {
-      await db.delete(productVariations).where(eq(productVariations.productId, id));
-      if (variations.length > 0) {
-        const variationValues = variations.map((v: any) => ({
-          productId: id,
-          size: v.size,
-          color: v.color || "Default",
-          stock: parseInt(v.stock) || 0,
-          mrp: parseFloat(v.mrp) || 0,
-          salePrice: parseFloat(v.salePrice) || 0,
-          sku: v.sku || `${id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
-        }));
-        await db.insert(productVariations).values(variationValues);
+      if (variations) {
+        tx.delete(productVariations).where(eq(productVariations.productId, id)).run();
+        if (variations.length > 0) {
+          const variationValues = variations.map((v: any) => ({
+            productId: id,
+            size: v.size,
+            color: v.color || "Default",
+            stock: parseInt(v.stock) || 0,
+            basePrice: Number(v.basePrice) || 0,
+            salePrice: Number(v.salePrice) || 0,
+            sku: v.sku || `${id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
+          }));
+          tx.insert(productVariations).values(variationValues).run();
+        }
       }
-    }
+    });
 
     return NextResponse.json({ success: true });
 

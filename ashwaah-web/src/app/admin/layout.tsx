@@ -31,22 +31,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen bg-brand-light font-inter">
+    <div className="flex h-screen bg-brand-light font-inter overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-72 bg-[#1B3022] text-white flex flex-col shadow-2xl fixed inset-y-0 z-50">
-        <div className="p-8 border-b border-white/5">
+      <aside className="w-60 bg-[#1B3022] text-white flex flex-col shadow-2xl fixed inset-y-0 z-50">
+        <div className="p-6 border-b border-white/5">
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 bg-[#C5A059] rounded-xl flex items-center justify-center shadow-lg group-hover:rotate-12 transition-transform">
-              <span className="font-serif font-bold text-xl text-[#1B3022]">A</span>
+            <div className="w-8 h-8 bg-[#C5A059] rounded-lg flex items-center justify-center shadow-lg group-hover:rotate-12 transition-transform">
+              <span className="font-serif font-bold text-lg text-[#1B3022]">A</span>
             </div>
             <div>
-              <h1 className="font-playfair font-bold text-xl tracking-tight">Ashwaah</h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-black">Admin Panel</p>
+              <h1 className="font-playfair font-bold text-lg tracking-tight leading-none">Ashwaah</h1>
+              <p className="text-[8px] uppercase tracking-[0.2em] text-[#C5A059] font-black mt-1">Admin Panel</p>
             </div>
           </Link>
         </div>
 
-        <nav className="flex-1 p-6 space-y-2 mt-4">
+        <nav className="flex-1 p-4 space-y-1 mt-4">
           {sidebarLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -55,9 +55,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={link.name}
                 href={link.href}
-                className={`flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all group ${
+                className={`flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${
                   isActive 
-                    ? "bg-[#C5A059] text-[#1B3022] shadow-xl translate-x-2" 
+                    ? "bg-[#C5A059] text-[#1B3022] shadow-lg translate-x-1" 
                     : "text-white/60 hover:text-white hover:bg-white/5"
                 }`}
               >
@@ -87,10 +87,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 
       {/* Main Content */}
-      <main className="flex-1 ml-72">
+      <main className="flex-1 ml-60 min-w-0 h-full overflow-hidden flex flex-col">
         {/* Header decoration */}
-        <div className="h-1 bg-gradient-to-r from-transparent via-[#C5A059]/20 to-transparent"></div>
-        <div className="p-10">
+        <div className="h-1 bg-gradient-to-r from-transparent via-[#C5A059]/20 to-transparent flex-shrink-0"></div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </main>

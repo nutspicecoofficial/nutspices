@@ -195,7 +195,9 @@ export default function DesignWorkspace() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingSection, setIsAddingSection] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -245,15 +247,31 @@ export default function DesignWorkspace() {
 
 
   const handleAddSection = async () => {
+    if (isAddingSection) return;
+    setIsAddingSection(true);
+    setErrorMsg("");
     try {
       const res = await fetch("/api/admin/sections", {
         method: "POST",
-        body: JSON.stringify({ menuId, title: "New Product Carousel", displayOrder: sections.length }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          menuId, 
+          title: "New Product Carousel", 
+          displayOrder: sections.length 
+        }),
       });
       const data = await res.json();
-      if (data.success) setSections([...sections, data.data]);
+      if (data.success) {
+        setSections([...sections, data.data]);
+        setSuccessMsg("New section added!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setErrorMsg(data.error || "Failed to create section");
+      }
     } catch (err) {
-      console.error("Failed to add section");
+      setErrorMsg("Network error. Please try again.");
+    } finally {
+      setIsAddingSection(false);
     }
   };
 
@@ -314,7 +332,7 @@ export default function DesignWorkspace() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
+    <div className="max-w-5xl mx-auto p-10 pb-20">
       <div className="mb-8">
         <Link 
           href="/admin/navigation" 
@@ -336,9 +354,10 @@ export default function DesignWorkspace() {
           <div className="flex items-center space-x-4">
             <button 
               onClick={handleAddSection}
-              className="flex items-center space-x-2 bg-brand/5 text-brand px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brand/10 transition-all"
+              disabled={isAddingSection}
+              className="flex items-center space-x-2 bg-brand/5 text-brand px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brand/10 transition-all disabled:opacity-50"
             >
-              <Plus size={16} />
+              {isAddingSection ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
               <span>Add Section</span>
             </button>
             <button 
@@ -354,9 +373,16 @@ export default function DesignWorkspace() {
       </div>
 
       {successMsg && (
-        <div className="mb-8 p-4 bg-green-50 border border-green-100 rounded-xl flex items-center space-x-3 text-green-600 animate-in fade-in">
+        <div className="mb-8 p-4 bg-green-50 border border-green-100 rounded-xl flex items-center space-x-3 text-green-600 animate-in fade-in slide-in-from-top-4">
           <Check size={20} />
           <span className="text-sm font-bold uppercase tracking-wider">{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center space-x-3 text-red-600 animate-in fade-in slide-in-from-top-4">
+          <X size={20} />
+          <span className="text-sm font-bold uppercase tracking-wider">{errorMsg}</span>
         </div>
       )}
 
@@ -382,9 +408,11 @@ export default function DesignWorkspace() {
             <p className="text-brand/40 text-sm font-bold uppercase tracking-widest">No sections found</p>
             <button 
               onClick={handleAddSection}
-              className="mt-4 text-[#C5A059] font-bold text-sm hover:underline"
+              disabled={isAddingSection}
+              className="mt-4 text-[#C5A059] font-bold text-sm hover:underline disabled:opacity-50 flex items-center justify-center mx-auto space-x-2"
             >
-              Add your first carousel
+              {isAddingSection && <Loader2 size={14} className="animate-spin" />}
+              <span>{isAddingSection ? "Adding..." : "Add your first carousel"}</span>
             </button>
           </div>
         )}

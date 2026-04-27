@@ -11,7 +11,7 @@
 }
 
 body {
-  @apply bg-brand-light text-brand-dark font-inter antialiased;
+  @apply bg-brand-light text-brand-dark font-inter antialiased overflow-x-hidden max-w-full;
 }
 
 /* Optional custom classes */
@@ -21,3 +21,15 @@ body {
 .input-field {
   @apply w-full bg-white border border-brand/20 rounded-xl py-3 px-4 text-brand placeholder-brand/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-all shadow-sm;
 }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-brand/5 rounded-full;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-brand/20 rounded-full hover:bg-brand/30 transition-colors;
+}
+

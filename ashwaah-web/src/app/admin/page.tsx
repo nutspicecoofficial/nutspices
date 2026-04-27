@@ -74,7 +74,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div>
+    <div className="p-10">
       <div className="mb-10">
         <h1 className="text-4xl font-playfair font-bold text-brand">Dashboard Overview</h1>
         <p className="mt-2 text-brand/60 font-medium tracking-tight flex items-center">

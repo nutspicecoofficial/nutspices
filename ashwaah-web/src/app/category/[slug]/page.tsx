@@ -75,7 +75,7 @@ export default async function CategoryPage({ params }: PageProps) {
       
       {/* Dynamic Sections */}
       {sectionsWithProducts.length > 0 ? (
-        <div className="space-y-16">
+        <div className="space-y-0">
           {sectionsWithProducts.map((section) => (
             <ProductCarousel 
               key={section.id} 
@@ -85,7 +85,7 @@ export default async function CategoryPage({ params }: PageProps) {
           ))}
         </div>
       ) : (
-        <div className="py-32 text-center bg-brand/5 rounded-[3rem] border border-brand/10 px-8">
+        <section className="py-4 text-center bg-brand/5 rounded-[3rem] border border-brand/10 px-8">
           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
             <ShoppingBag className="text-[#C5A059]" size={32} />
           </div>
@@ -93,7 +93,7 @@ export default async function CategoryPage({ params }: PageProps) {
           <p className="text-brand/60 max-w-sm mx-auto">
             We are currently curating the perfect selection for this category. Check back soon for the latest arrivals.
           </p>
-        </div>
+        </section>
       )}
 
       {/* Footer Grid - Optional/Default if no sections? Or just extra products? */}

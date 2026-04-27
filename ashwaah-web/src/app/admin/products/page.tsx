@@ -19,10 +19,10 @@ const PRESET_COLORS = [
   { name: "Brown", hex: "#92400E" },
 ];
 
-interface Variation { size: string; color: string; stock: number; sku: string; mrp: number; salePrice: number; }
+interface Variation { size: string; color: string; stock: number; sku: string; basePrice: number; salePrice: number; }
 interface Product {
   id: number; name: string; description: string | null;
-  mrp: number; salePrice: number; images: string;
+  basePrice: number; salePrice: number; images: string;
   avgRating: number; numReviews: number; category: string | null;
   gender: string | null; totalStock: number;
 }
@@ -92,7 +92,7 @@ export default function ProductManagement() {
         colorsToUse.forEach(color => {
           const exists = newVariations.find(v => v.size === size && v.color === color);
           if (!exists) {
-            newVariations.push({ size, color, stock: 0, sku: "", mrp: 0, salePrice: 0 });
+            newVariations.push({ size, color, stock: 0, sku: "", basePrice: 0, salePrice: 0 });
           }
         });
       });
@@ -120,7 +120,7 @@ export default function ProductManagement() {
   const resetForm = () => {
     setEditingId(null);
     setName(""); setDescription(""); setGender("unisex"); setCategory("");
-    setMrp(""); setSalePrice(""); setAvgRating("4.3"); setNumReviews("1");
+    setAvgRating("4.3"); setNumReviews("1");
     setIsFeatured(false); setTags(""); setImages([]);
     setSelectedSizes([]); setSelectedColors([]); setVariations([]);
   };
@@ -165,7 +165,9 @@ export default function ProductManagement() {
     e.preventDefault();
     if (!name.trim()) return showToast("Product name is required.");
     if (images.length < 1) return showToast("Add at least 1 image URL.");
-    if (!mrp || !salePrice) return showToast("MRP and Sale Price are required.");
+    if (variations.length === 0) return showToast("Please add at least one size/color variation.");
+    const invalidVariation = variations.find(v => !v.basePrice || !v.salePrice);
+    if (invalidVariation) return showToast(`Please provide base price and sale price for variation: ${invalidVariation.size} / ${invalidVariation.color}`);
     setIsSubmitting(true);
     try {
       const method = editingId ? "PATCH" : "POST";
@@ -185,8 +187,8 @@ export default function ProductManagement() {
         fetchProducts(); 
         resetForm(); 
       }
-      else showToast(data.error || "Failed to save product.");
-    } catch { showToast("Network error."); } finally { setIsSubmitting(false); }
+      else showToast(data.details || data.error || "Failed to save product.");
+    } catch (err: any) { showToast(err.message || "Network error."); } finally { setIsSubmitting(false); }
   };
 
   const handleDelete = async (id: number) => {
@@ -205,17 +207,17 @@ export default function ProductManagement() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto p-6 md:p-10">
+    <div className="h-full w-full overflow-hidden">
       {toast && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#1B3022] text-[#C5A059] px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 font-bold text-sm">
           <Check size={18} /><span>{toast}</span>
         </div>
       )}
 
-      <div className="flex flex-col xl:flex-row gap-12">
-
-        {/* ─── LEFT: FORM ────────────────────────────────────────── */}
-        <div className="flex-1">
+      <div className="flex h-full w-full overflow-hidden">
+        
+        {/* ─── LEFT: FORM (Middle Workspace) ────────────────────────── */}
+        <div className="flex-[3] h-full overflow-y-auto custom-scrollbar p-6 md:p-10 border-r border-brand/5">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-[#C5A059]/10 rounded-xl">
@@ -267,15 +269,23 @@ export default function ProductManagement() {
                   <label className={LABEL}>Tags (comma-separated)</label>
                   <input value={tags} onChange={e => setTags(e.target.value)} placeholder="cotton, festive, handloom, bestseller…" className={INPUT} />
                 </div>
-                <div className="flex items-center space-x-4 p-5 bg-brand/5 rounded-2xl">
-                  <button type="button" onClick={() => setIsFeatured(!isFeatured)} className={`w-12 h-6 rounded-full transition-colors relative ${isFeatured ? "bg-[#C5A059]" : "bg-brand/20"}`}>
-                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${isFeatured ? "translate-x-7" : "translate-x-1"}`} />
-                  </button>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-brand">Featured Product</p>
-                    <p className="text-[10px] text-brand/40">Show this product in homepage featured section</p>
+                <div className="flex items-center justify-between p-6 bg-brand/5 rounded-[2.5rem] border border-brand/10 transition-all hover:bg-brand/[0.08]">
+                  <div className="flex items-center space-x-4">
+                    <div className={`p-3 rounded-2xl transition-all ${isFeatured ? "bg-brand-accent/20 text-brand-accent" : "bg-brand/10 text-brand/30"}`}>
+                      <Sparkles size={20} className={isFeatured ? "animate-pulse" : ""} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-brand uppercase tracking-widest">Featured Product</p>
+                      <p className="text-[10px] text-brand/40 font-medium">Spotlight this item on the homepage</p>
+                    </div>
                   </div>
-                  <Sparkles size={16} className={isFeatured ? "text-[#C5A059]" : "text-brand/20"} />
+                  <button 
+                    type="button" 
+                    onClick={() => setIsFeatured(!isFeatured)} 
+                    className={`w-14 h-7 rounded-full transition-all relative flex items-center px-1 ${isFeatured ? "bg-brand-accent shadow-[0_0_15px_rgba(197,160,89,0.3)]" : "bg-brand/20"}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white shadow-lg transition-transform duration-300 ease-out ${isFeatured ? "translate-x-7" : "translate-x-0"}`} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -330,53 +340,57 @@ export default function ProductManagement() {
             {/* ── Section 5: Colors ── */}
             <div>
               <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">5</span> Available Colors</h3>
-              <div className="flex flex-wrap gap-3 mb-6">
-                {selectedColors.map(colorName => {
-                   const preset = PRESET_COLORS.find(c => c.name === colorName);
-                   const hex = colorName.startsWith("#") ? colorName : preset?.hex;
-                   return (
-                    <button key={colorName} type="button" onClick={() => toggleColor(colorName)}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-[#C5A059] bg-[#C5A059]/10 text-brand">
-                      <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: hex }} />
-                      <span>{colorName}</span>
-                      <Check size={10} className="text-[#C5A059]" />
-                    </button>
-                   );
-                })}
-                {PRESET_COLORS.filter(c => !selectedColors.includes(c.name)).map(color => (
-                  <button key={color.name} type="button" onClick={() => toggleColor(color.name)}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-transparent bg-brand/5 text-brand/50 hover:border-brand/20">
-                    <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: color.hex }} />
-                    <span>{color.name}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center space-x-4 p-6 bg-brand/5 rounded-[2rem] border border-brand/5">
-                 <div className="flex-1">
-                    <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-1">Add Custom Color</label>
-                    <p className="text-[9px] text-brand/30 font-bold mb-3 uppercase tracking-wider">Select a color then click add</p>
-                    <div className="flex items-center space-x-4">
-                      <div className="relative w-12 h-12 rounded-2xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-                        <input 
-                          type="color" 
-                          id="customColorPicker"
-                          defaultValue="#C5A059"
-                          className="absolute -inset-2 w-16 h-16 cursor-pointer"
-                        />
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const picker = document.getElementById("customColorPicker") as HTMLInputElement;
-                          const newColor = picker.value;
-                          if (!selectedColors.includes(newColor)) setSelectedColors([...selectedColors, newColor]);
-                        }}
-                        className="bg-brand text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-dark transition-all"
-                      >
-                        Add Selected Color
+              <div className="mb-8">
+                <div className="flex flex-wrap gap-3">
+                  {selectedColors.map(colorName => {
+                    const preset = PRESET_COLORS.find(c => c.name === colorName);
+                    const hex = colorName.startsWith("#") ? colorName : preset?.hex;
+                    return (
+                      <button key={colorName} type="button" onClick={() => toggleColor(colorName)}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-[#C5A059] bg-[#C5A059]/10 text-brand">
+                        <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: hex }} />
+                        <span>{colorName}</span>
+                        <Check size={10} className="text-[#C5A059]" />
                       </button>
+                    );
+                  })}
+                  {PRESET_COLORS.filter(c => !selectedColors.includes(c.name)).map(color => (
+                    <button key={color.name} type="button" onClick={() => toggleColor(color.name)}
+                      className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-transparent bg-brand/5 text-brand/50 hover:border-brand/20">
+                      <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: color.hex }} />
+                      <span>{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-8 bg-brand/5 rounded-[2.5rem] border border-brand/10 transition-all hover:bg-brand/[0.07]">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-brand uppercase tracking-[0.2em] mb-1">Custom Color Palette</label>
+                    <p className="text-[10px] text-brand/40 font-medium">Fine-tune your product spectrum</p>
+                  </div>
+                  <div className="flex items-center space-x-4 bg-white p-2 rounded-2xl shadow-sm border border-brand/5">
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-brand/10 shadow-inner flex-shrink-0">
+                      <input 
+                        type="color" 
+                        id="customColorPicker"
+                        defaultValue="#C5A059"
+                        className="absolute -inset-2 w-16 h-16 cursor-pointer"
+                      />
                     </div>
-                 </div>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const picker = document.getElementById("customColorPicker") as HTMLInputElement;
+                        const newColor = picker.value;
+                        if (!selectedColors.includes(newColor)) setSelectedColors([...selectedColors, newColor]);
+                      }}
+                      className="bg-brand text-white px-6 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-accent hover:text-brand transition-all active:scale-95"
+                    >
+                      Add Selected Color
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -384,13 +398,14 @@ export default function ProductManagement() {
             <div>
               <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">6</span> Variation Matrix (Stock & SKU)</h3>
               {variations.length > 0 ? (
-                <div className="overflow-x-auto rounded-2xl border border-brand/5">
+                <div className="overflow-hidden rounded-[2rem] border border-brand/5 shadow-sm">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-brand text-white/60 font-black uppercase tracking-widest">
                       <tr>
                         <th className="px-5 py-4">Size</th>
                         <th className="px-5 py-4">Color</th>
-                        <th className="px-5 py-4">MRP (₹)</th>
+                        <th className="px-5 py-4">Base Price (₹)</th>
                         <th className="px-5 py-4">Sale (₹)</th>
                         <th className="px-5 py-4">Stock</th>
                         <th className="px-5 py-4">SKU</th>
@@ -408,7 +423,7 @@ export default function ProductManagement() {
                             </div>
                           </td>
                           <td className="px-5 py-3">
-                            <input type="number" value={v.mrp} onChange={e => updateVariation(v.size, v.color, "mrp", parseFloat(e.target.value) || 0)} className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" placeholder="1000" />
+                            <input type="number" value={v.basePrice} onChange={e => updateVariation(v.size, v.color, "basePrice", parseFloat(e.target.value) || 0)} className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" placeholder="1000" />
                           </td>
                           <td className="px-5 py-3">
                             <input type="number" value={v.salePrice} onChange={e => updateVariation(v.size, v.color, "salePrice", parseFloat(e.target.value) || 0)} className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none text-green-600" placeholder="699" />
@@ -433,6 +448,7 @@ export default function ProductManagement() {
                     </tbody>
                   </table>
                 </div>
+              </div>
               ) : (
                 <div className="py-10 text-center border-2 border-dashed border-brand/10 rounded-2xl">
                   <p className="text-[10px] font-black text-brand/30 uppercase tracking-[0.2em]">Select sizes and/or colors above to generate the variation matrix</p>
@@ -442,15 +458,18 @@ export default function ProductManagement() {
 
             {/* Submit */}
             <button disabled={isSubmitting}
-              className="w-full bg-[#1B3022] text-[#C5A059] py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-sm hover:bg-[#2c4d37] transition-all shadow-xl disabled:opacity-50 flex items-center justify-center space-x-3">
-              {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : editingId ? <Check size={18} /> : <Plus size={18} />}
-              <span>{editingId ? "Update Product" : "Add to Store"}</span>
+              className="w-full bg-brand text-brand-accent py-6 rounded-[2rem] font-black uppercase tracking-[0.4em] text-xs hover:bg-brand-hover hover:shadow-[0_20px_40px_rgba(27,48,34,0.2)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-4 shadow-2xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+              <div className="relative flex items-center space-x-3">
+                {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : editingId ? <Check size={20} /> : <Plus size={20} />}
+                <span>{isSubmitting ? "Processing..." : editingId ? "Update Product" : "Add to Store"}</span>
+              </div>
             </button>
           </form>
         </div>
 
-        {/* ─── RIGHT: INVENTORY ─────────────────────────────────── */}
-        <div className="w-full xl:w-[480px] xl:sticky xl:top-24 xl:self-start">
+        {/* ─── RIGHT: INVENTORY (Context Sidebar) ───────────────────── */}
+        <div className="flex-[1] min-w-[320px] h-full overflow-y-auto bg-brand/5 custom-scrollbar p-6">
           <div className="flex flex-col space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -472,7 +491,7 @@ export default function ProductManagement() {
               />
             </div>
 
-            <div className="space-y-3 max-h-[calc(100vh-20rem)] overflow-y-auto pr-1">
+            <div className="space-y-2 pr-1">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-brand/20">
                   <Loader2 size={36} className="animate-spin mb-3" />
@@ -486,40 +505,32 @@ export default function ProductManagement() {
                 </div>
               ) : filteredProducts.map(product => {
                 const imgs = JSON.parse(product.images || "[]");
-                const off = product.mrp && product.salePrice ? Math.round((1 - product.salePrice / product.mrp) * 100) : 0;
+                const off = product.basePrice && product.salePrice ? Math.round((1 - product.salePrice / product.basePrice) * 100) : 0;
                 const isCurrentlyEditing = editingId === product.id;
                 
                 return (
-                  <div key={product.id} className={`bg-white rounded-2xl p-4 border transition-all group ${isCurrentlyEditing ? "border-[#C5A059] shadow-md ring-1 ring-[#C5A059]/20" : "border-brand/5 shadow-sm hover:border-[#C5A059]/30"}`}>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-brand/5 border border-brand/5 flex-shrink-0">
+                  <div key={product.id} className={`bg-white rounded-2xl p-3 border transition-all duration-300 group ${isCurrentlyEditing ? "border-brand-accent shadow-lg" : "border-brand/5 hover:border-brand-accent/30 shadow-sm"}`}>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-brand/5 border border-brand/5 flex-shrink-0 relative">
                         <img src={imgs[0] || "/images/placeholder.png"} alt={product.name} className="w-full h-full object-cover" onError={e => (e.currentTarget.src = "/images/placeholder.png")} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          <h3 className="text-xs font-bold text-brand truncate">{product.name}</h3>
-                          {product.isFeatured && <Sparkles size={10} className="text-[#C5A059]" />}
+                          <h3 className="text-[11px] font-bold text-brand truncate">{product.name}</h3>
+                          {product.isFeatured && <Sparkles size={8} className="text-brand-accent" />}
                         </div>
-                        <div className="flex items-center space-x-2 mt-1 flex-wrap">
-                          <span className="text-xs font-bold text-brand">₹{product.salePrice?.toLocaleString()}</span>
-                          <span className="text-[9px] text-brand/30 line-through">₹{product.mrp?.toLocaleString()}</span>
-                          {off > 0 && <span className="text-[8px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{off}% OFF</span>}
+                        <div className="flex items-center space-x-2 mt-0.5">
+                          <span className="text-[10px] font-black text-brand">₹{product.salePrice?.toLocaleString()}</span>
+                          {off > 0 && <span className="text-[8px] text-green-600 font-bold">{off}% OFF</span>}
                         </div>
-                        <div className="flex items-center space-x-2 mt-1.5">
-                          <span className="text-[8px] font-black text-brand/30 uppercase tracking-widest bg-brand/5 px-2 py-0.5 rounded-md">{product.category || "No Category"}</span>
-                          <div className="flex items-center space-x-1">
-                            <Star size={8} fill="#C5A059" className="text-[#C5A059]" />
-                            <span className="text-[8px] text-brand/40 font-bold">{product.avgRating}</span>
+                        <div className="flex items-center justify-between mt-2">
+                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${(product.totalStock || 0) > 10 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+                            {product.totalStock || 0} STOCK
+                          </span>
+                          <div className="flex space-x-1">
+                            <button onClick={() => handleEdit(product.id)} className={`p-1.5 rounded-lg transition-all ${isCurrentlyEditing ? "bg-brand text-white" : "bg-brand/5 text-brand hover:bg-brand hover:text-white"}`}><Edit3 size={10} /></button>
+                            <button onClick={() => handleDelete(product.id)} className="p-1.5 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={10} /></button>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={`text-[9px] font-black px-2 py-1 rounded-full ${(product.totalStock || 0) > 10 ? "bg-green-50 text-green-600" : (product.totalStock || 0) > 0 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"}`}>
-                          {product.totalStock || 0} left
-                        </span>
-                        <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(product.id)} className={`p-2 rounded-lg transition-all ${isCurrentlyEditing ? "bg-brand text-white" : "bg-brand/5 text-brand hover:bg-brand hover:text-white"}`}><Edit3 size={12} /></button>
-                          <button onClick={() => handleDelete(product.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={12} /></button>
                         </div>
                       </div>
                     </div>

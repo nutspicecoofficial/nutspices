@@ -31,7 +31,7 @@ export default function ProductCarousel({ title, products }: ProductCarouselProp
   if (products.length === 0) return null;
 
   return (
-    <section className="py-16">
+    <section className="py-4">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-3xl font-playfair font-bold text-brand tracking-tight">{title}</h2>
         <div className="flex space-x-2">
