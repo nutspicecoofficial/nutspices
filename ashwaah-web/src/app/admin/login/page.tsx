@@ -13,7 +13,7 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const adminPhone = "9876543210";
+  const adminPhone = "9999999999";
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -65,7 +65,7 @@ export default function AdminLogin() {
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
-        body: JSON.stringify({ action: "verify", phone, otp }),
+        body: JSON.stringify({ action: "verify", phone, otp, portal: "admin" }),
       });
       const data = await res.json();
 
@@ -126,7 +126,7 @@ export default function AdminLogin() {
                   type="tel"
                   value={phone}
                   onChange={handlePhoneChange}
-                  placeholder="9876543210"
+                  placeholder="9999999999"
                   className="w-full bg-[#1B3022]/5 border-2 border-transparent focus:border-[#C5A059]/30 focus:bg-white rounded-xl py-4 pl-20 pr-4 text-[#1B3022] font-bold tracking-widest transition-all outline-none"
                   required
                 />

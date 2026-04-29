@@ -6,8 +6,8 @@ import { cookies } from "next/headers";
 
 async function isAdmin() {
   const cookieStore = await cookies();
-  const session = cookieStore.get("auth_session")?.value;
-  return session === "9876543210";
+  const session = cookieStore.get("admin_session")?.value;
+  return session === "9999999999";
 }
 
 export async function GET(request: Request) {
@@ -43,12 +43,15 @@ export async function GET(request: Request) {
       isFeatured: products.isFeatured,
       tags: products.tags,
       colors: products.colors,
-      totalStock: sql<number>`(SELECT SUM(stock) FROM ${productVariations} WHERE product_id = ${products.id})`.mapWith(Number)
+      enabledMeasurements: products.enabledMeasurements,
+      totalStock: sql<number>`SUM(${productVariations.stock})`.mapWith(Number)
     })
     .from(products)
+    .leftJoin(productVariations, eq(products.id, productVariations.productId))
     .where(
       search ? or(like(products.name, `%${search}%`), like(products.category, `%${search}%`)) : undefined
-    );
+    )
+    .groupBy(products.id);
 
     return NextResponse.json({ success: true, data: results });
   } catch (error) {
@@ -66,7 +69,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { 
       name, description, salePrice, images, variations,
-      avgRating, numReviews, category, gender, colors, tags, isFeatured
+      avgRating, numReviews, category, gender, colors, tags, isFeatured, enabledMeasurements
     } = body;
 
     // Validation
@@ -92,6 +95,7 @@ export async function POST(request: Request) {
         gender: (gender as "men" | "women" | "unisex") || "unisex",
         tags: tags || null,
         isFeatured: !!isFeatured,
+        enabledMeasurements: enabledMeasurements || null,
       }).returning().all();
 
       if (!productResult || productResult.length === 0) {
@@ -136,7 +140,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { 
       id, name, description, salePrice, images, variations,
-      avgRating, numReviews, category, gender, colors, tags, isFeatured
+      avgRating, numReviews, category, gender, colors, tags, isFeatured, enabledMeasurements
     } = body;
 
     if (!id) return NextResponse.json({ success: false, error: "ID is required" }, { status: 400 });
@@ -160,6 +164,7 @@ export async function PATCH(request: Request) {
         gender: gender || "unisex",
         tags: tags || null,
         isFeatured: !!isFeatured,
+        enabledMeasurements: enabledMeasurements || null,
       }).where(eq(products.id, id)).run();
 
       if (variations) {

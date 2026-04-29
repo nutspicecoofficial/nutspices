@@ -1,41 +1,49 @@
-import ProductCard from './ProductCard';
+"use client";
 
-const mockProducts = [
-  {
-    id: "men-linen-shirt",
-    name: "Premium Linen Shirt",
-    description: "Custom fit premium cotton and linen blend. Breathable and elegant.",
-    price: 4499,
-    imageUrl: "/images/men_linen_shirt.png",
-    categorySlug: "men"
-  },
-  {
-    id: "men-trousers",
-    name: "Tailored Trousers",
-    description: "Perfectly proportioned, custom-tailored trousers for a sharp look.",
-    price: 5299,
-    imageUrl: "/images/men_trousers.png",
-    categorySlug: "men"
-  },
-  {
-    id: "women-kurti",
-    name: "Sophisticated Kurti",
-    description: "Elegant styling with gold accents and a tailored fit.",
-    price: 3899,
-    imageUrl: "/images/women_kurti.png",
-    categorySlug: "ethnic-wear"
-  },
-  {
-    id: "women-bodycon",
-    name: "Crimson Bodycon",
-    description: "Enhances your natural glow with perfectly formulated proportions.",
-    price: 6299,
-    imageUrl: "/images/women_bodycon.png",
-    categorySlug: "women"
-  }
-];
+import { useEffect, useState } from "react";
+import ProductCard from './ProductCard';
+import { Loader2 } from "lucide-react";
+
+interface Product {
+  id: number;
+  name: string;
+  description: string;
+  salePrice: number;
+  basePrice: number;
+  images: string; // JSON string
+  category?: string;
+}
 
 export default function ProductGrid() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFeatured() {
+      try {
+        const res = await fetch("/api/products/featured");
+        const data = await res.json();
+        if (data.success) {
+          setProducts(data.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch featured products", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFeatured();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="animate-spin text-brand-accent mb-4" size={40} />
+        <p className="text-brand/40 font-bold uppercase tracking-widest text-xs">Curating Collections...</p>
+      </div>
+    );
+  }
+
   return (
     <section className="py-20">
       <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-brand/10 pb-6">
@@ -43,17 +51,34 @@ export default function ProductGrid() {
           <h2 className="text-4xl font-playfair font-bold mb-3 text-brand">Featured Collections</h2>
           <p className="text-brand/60 italic">Crafted for elegance. Tailored for you.</p>
         </div>
-        <div className="mt-4 md:mt-0">
-          <span className="text-brand-accent font-bold tracking-widest text-sm uppercase cursor-pointer hover:text-brand transition-colors">
-            Explore All Collections
-          </span>
+      </div>
+
+      {products.length === 0 ? (
+        <div className="py-20 text-center border-2 border-dashed border-brand/10 rounded-3xl">
+          <p className="text-brand/30 font-bold uppercase tracking-widest text-xs">New collections coming soon</p>
         </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
-        {mockProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+          {products.map((product: any) => {
+            const images = JSON.parse(product.images || "[]");
+            const firstImage = images.length > 0 ? images[0] : (product.imageUrl || "/images/placeholder.png");
+            
+            return (
+              <ProductCard 
+                key={product.id} 
+                product={{
+                  id: product.id.toString(),
+                  name: product.name,
+                  description: product.description || "",
+                  price: product.salePrice || product.basePrice,
+                  imageUrl: firstImage,
+                  categorySlug: product.category || "all"
+                }} 
+              />
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

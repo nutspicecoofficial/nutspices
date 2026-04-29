@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Package, Trash2, Edit3, X, Star, Loader2, Check, Tag, Sparkles, Search } from "lucide-react";
+import { Plus, Package, Trash2, Edit3, X, Star, Loader2, Check, Tag, Sparkles, Search, Scissors } from "lucide-react";
+import { MALE_MEASUREMENTS, FEMALE_MEASUREMENTS } from "@/constants/measurements";
 
 const SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 const PRESET_COLORS = [
@@ -48,6 +49,8 @@ export default function ProductManagement() {
   const [numReviews, setNumReviews] = useState("1");
   const [isFeatured, setIsFeatured] = useState(false);
   const [tags, setTags] = useState("");
+  const [enabledMeasurements, setEnabledMeasurements] = useState<string[]>([]);
+  const [pendingColor, setPendingColor] = useState("#C5A059");
 
   // Images
   const [imageInput, setImageInput] = useState("");
@@ -110,6 +113,7 @@ export default function ProductManagement() {
 
   const toggleSize = (s: string) => setSelectedSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   const toggleColor = (c: string) => setSelectedColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  const toggleMeasurement = (m: string) => setEnabledMeasurements(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
   const updateVariation = (size: string, color: string, field: keyof Variation, value: string | number) =>
     setVariations(prev => prev.map(v => v.size === size && v.color === color ? { ...v, [field]: value } : v));
 
@@ -123,6 +127,7 @@ export default function ProductManagement() {
     setAvgRating("4.3"); setNumReviews("1");
     setIsFeatured(false); setTags(""); setImages([]);
     setSelectedSizes([]); setSelectedColors([]); setVariations([]);
+    setEnabledMeasurements([]);
   };
 
   const handleEdit = async (id: number) => {
@@ -152,6 +157,16 @@ export default function ProductManagement() {
           setSelectedColors(colors);
           setVariations(p.variations);
         }
+
+        if (p.enabledMeasurements) {
+          try {
+            setEnabledMeasurements(JSON.parse(p.enabledMeasurements));
+          } catch {
+            setEnabledMeasurements([]);
+          }
+        } else {
+          setEnabledMeasurements([]);
+        }
         
         // Scroll to form
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -166,14 +181,19 @@ export default function ProductManagement() {
     if (!name.trim()) return showToast("Product name is required.");
     if (images.length < 1) return showToast("Add at least 1 image URL.");
     if (variations.length === 0) return showToast("Please add at least one size/color variation.");
-    const invalidVariation = variations.find(v => !v.basePrice || !v.salePrice);
-    if (invalidVariation) return showToast(`Please provide base price and sale price for variation: ${invalidVariation.size} / ${invalidVariation.color}`);
+    const emptyVariation = variations.find(v => !v.basePrice || !v.salePrice);
+    if (emptyVariation) return showToast(`Please provide prices for: ${emptyVariation.size} / ${emptyVariation.color}`);
+    
+    const overpricedVariation = variations.find(v => Number(v.salePrice) >= Number(v.basePrice));
+    if (overpricedVariation) return showToast(`Sale Price must be LOWER than Base Price for: ${overpricedVariation.size} / ${overpricedVariation.color}`);
+
     setIsSubmitting(true);
     try {
       const method = editingId ? "PATCH" : "POST";
       const payload = { 
         id: editingId, name, description, images, variations, 
-        avgRating, numReviews, category, gender, colors: selectedColors, tags, isFeatured 
+        avgRating, numReviews, category, gender, colors: selectedColors, tags, isFeatured,
+        enabledMeasurements: JSON.stringify(enabledMeasurements)
       };
       
       const res = await fetch("/api/admin/products", {
@@ -290,9 +310,63 @@ export default function ProductManagement() {
               </div>
             </div>
 
-            {/* ── Section 2: Images ── */}
+            {/* ── Section 2: Customization Settings ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">2</span> Product Images ({images.length}/10)</h3>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">2</span> 
+                Customization Settings
+              </h3>
+              <div className="bg-brand/5 rounded-[2.5rem] p-8 border border-brand/10">
+                <div className="flex items-center space-x-4 mb-6">
+                  <div className="p-3 bg-brand/10 rounded-2xl text-brand">
+                    <Scissors size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-brand uppercase tracking-widest">Enable Custom Fit</p>
+                    <p className="text-[10px] text-brand/40 font-medium">Select measurements users can provide for this product</p>
+                  </div>
+                </div>
+
+                {gender === "unisex" ? (
+                  <div className="py-4 text-center text-brand/30 bg-white/50 rounded-2xl border border-dashed border-brand/10">
+                    <p className="text-[10px] font-bold uppercase tracking-widest">Please select Men or Women gender to configure measurements</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {(gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS).map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => toggleMeasurement(m)}
+                        className={`flex items-center space-x-3 p-4 rounded-2xl border transition-all ${
+                          enabledMeasurements.includes(m)
+                            ? "bg-brand text-white border-brand shadow-lg"
+                            : "bg-white text-brand/60 border-brand/5 hover:border-brand/20"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                          enabledMeasurements.includes(m) ? "bg-white border-white text-brand" : "bg-brand/5 border-brand/10"
+                        }`}>
+                          {enabledMeasurements.includes(m) && <Check size={12} strokeWidth={4} />}
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest truncate">{m}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {enabledMeasurements.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-brand/10 flex items-center justify-between">
+                    <span className="text-[10px] font-black text-brand/40 uppercase tracking-widest">Total Enabled: {enabledMeasurements.length}</span>
+                    <button type="button" onClick={() => setEnabledMeasurements([])} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors">Clear All</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Section 3: Images ── */}
+            <div>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">3</span> Product Images ({images.length}/10)</h3>
               <div className="flex gap-3 mb-5">
                 <input value={imageInput} onChange={e => setImageInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addImage())} placeholder="Paste image URL and press Enter or click Add →" className={`${INPUT} flex-1`} />
                 <button type="button" onClick={addImage} className="bg-[#1B3022] text-[#C5A059] px-5 py-2 rounded-2xl font-bold text-xs hover:bg-[#2c4d37] transition-all whitespace-nowrap">Add URL</button>
@@ -315,18 +389,18 @@ export default function ProductManagement() {
               )}
             </div>
 
-            {/* ── Section 3: Stock ── */}
+            {/* ── Section 4: Stock ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">3</span> Inventory Overview</h3>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">4</span> Inventory Overview</h3>
               <div className="p-5 bg-brand/5 rounded-2xl flex items-center justify-between">
                 <span className="text-[10px] font-black text-brand/40 uppercase tracking-widest">Total Combined Stock (All variations)</span>
                 <span className="text-2xl font-black text-brand">{totalStock}</span>
               </div>
             </div>
 
-            {/* ── Section 4: Sizes ── */}
+            {/* ── Section 5: Sizes ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">4</span> Available Sizes</h3>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">5</span> Available Sizes</h3>
               <div className="flex flex-wrap gap-2">
                 {SIZES.map(size => (
                   <button key={size} type="button" onClick={() => toggleSize(size)}
@@ -337,66 +411,97 @@ export default function ProductManagement() {
               </div>
             </div>
 
-            {/* ── Section 5: Colors ── */}
+            {/* ── Section 6: Available Colors ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">5</span> Available Colors</h3>
-              <div className="mb-8">
-                <div className="flex flex-wrap gap-3">
-                  {selectedColors.map(colorName => {
-                    const preset = PRESET_COLORS.find(c => c.name === colorName);
-                    const hex = colorName.startsWith("#") ? colorName : preset?.hex;
-                    return (
-                      <button key={colorName} type="button" onClick={() => toggleColor(colorName)}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-[#C5A059] bg-[#C5A059]/10 text-brand">
-                        <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: hex }} />
-                        <span>{colorName}</span>
-                        <Check size={10} className="text-[#C5A059]" />
-                      </button>
-                    );
-                  })}
-                  {PRESET_COLORS.filter(c => !selectedColors.includes(c.name)).map(color => (
-                    <button key={color.name} type="button" onClick={() => toggleColor(color.name)}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-transparent bg-brand/5 text-brand/50 hover:border-brand/20">
-                      <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: color.hex }} />
-                      <span>{color.name}</span>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">6</span> 
+                Available Colors
+              </h3>
+              <div className="space-y-6">
+                {/* Preset Colors */}
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                  {PRESET_COLORS.map(color => (
+                    <button
+                      key={color.name}
+                      type="button"
+                      onClick={() => toggleColor(color.name)}
+                      className={`group relative flex flex-col items-center space-y-2 p-3 rounded-2xl border transition-all ${
+                        selectedColors.includes(color.name) 
+                          ? "bg-brand border-brand shadow-lg scale-105" 
+                          : "bg-white border-brand/5 hover:border-brand/20"
+                      }`}
+                    >
+                      <div 
+                        className={`w-8 h-8 rounded-full border border-black/5 shadow-inner transition-transform group-hover:scale-110 ${selectedColors.includes(color.name) ? "ring-2 ring-white ring-offset-2 ring-offset-brand" : ""}`}
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      <span className={`text-[8px] font-black uppercase tracking-tighter text-center line-clamp-1 ${selectedColors.includes(color.name) ? "text-white" : "text-brand/40"}`}>
+                        {color.name}
+                      </span>
+                      {selectedColors.includes(color.name) && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand-accent text-white rounded-full flex items-center justify-center shadow-md">
+                          <Check size={8} strokeWidth={4} />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="p-8 bg-brand/5 rounded-[2.5rem] border border-brand/10 transition-all hover:bg-brand/[0.07]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div>
-                    <label className="block text-[10px] font-black text-brand uppercase tracking-[0.2em] mb-1">Custom Color Palette</label>
-                    <p className="text-[10px] text-brand/40 font-medium">Fine-tune your product spectrum</p>
-                  </div>
-                  <div className="flex items-center space-x-4 bg-white p-2 rounded-2xl shadow-sm border border-brand/5">
-                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-brand/10 shadow-inner flex-shrink-0">
-                      <input 
-                        type="color" 
-                        id="customColorPicker"
-                        defaultValue="#C5A059"
-                        className="absolute -inset-2 w-16 h-16 cursor-pointer"
-                      />
+
+                {/* Custom Color Input */}
+                <div className="flex items-center space-x-6 p-6 bg-brand/5 rounded-[2rem] border border-brand/10">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-3">Custom Color Picker</p>
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          value={pendingColor}
+                          onChange={(e) => setPendingColor(e.target.value.toUpperCase())}
+                          className="w-14 h-14 p-1 bg-white border border-brand/20 rounded-2xl cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: pendingColor }} />
+                      </div>
+                      
+                      <div className="flex-1 space-y-2">
+                        <input 
+                          type="text" 
+                          value={pendingColor}
+                          onChange={(e) => setPendingColor(e.target.value.toUpperCase())}
+                          placeholder="#C5A059" 
+                          className="w-full bg-white border border-brand/10 rounded-xl px-4 py-2 text-xs font-black text-brand uppercase tracking-widest focus:border-brand-accent outline-none transition-all"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (!selectedColors.includes(pendingColor)) {
+                              if (window.confirm(`Add color ${pendingColor} to this product's variations?`)) {
+                                toggleColor(pendingColor);
+                              }
+                            } else {
+                              showToast("Color already selected");
+                            }
+                          }}
+                          className="w-full bg-[#1B3022] text-[#C5A059] py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2c4d37] transition-all shadow-md active:scale-95"
+                        >
+                          Add Color to Matrix
+                        </button>
+                      </div>
                     </div>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        const picker = document.getElementById("customColorPicker") as HTMLInputElement;
-                        const newColor = picker.value;
-                        if (!selectedColors.includes(newColor)) setSelectedColors([...selectedColors, newColor]);
-                      }}
-                      className="bg-brand text-white px-6 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-accent hover:text-brand transition-all active:scale-95"
-                    >
-                      Add Selected Color
-                    </button>
+                  </div>
+                  <div className="hidden md:block w-px h-16 bg-brand/10" />
+                  <div className="hidden md:block flex-1">
+                    <p className="text-[9px] text-brand/30 font-medium leading-relaxed italic">
+                      Pick a shade and click "Add Color" to confirm. This will generate new size variations in the matrix below.
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ── Section 6: Variation Matrix ── */}
+
+            {/* ── Section 7: Variation Matrix ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">6</span> Variation Matrix (Stock & SKU)</h3>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">7</span> Variation Matrix (Stock & SKU)</h3>
               {variations.length > 0 ? (
                 <div className="overflow-hidden rounded-[2rem] border border-brand/5 shadow-sm">
                   <div className="overflow-x-auto">
@@ -423,16 +528,32 @@ export default function ProductManagement() {
                             </div>
                           </td>
                           <td className="px-5 py-3">
-                            <input type="number" value={v.basePrice} onChange={e => updateVariation(v.size, v.color, "basePrice", parseFloat(e.target.value) || 0)} className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" placeholder="1000" />
+                            <input 
+                              type="number" 
+                              value={v.basePrice ?? ""} 
+                              onChange={e => updateVariation(v.size, v.color, "basePrice", e.target.value === "" ? "" : parseFloat(e.target.value))} 
+                              className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" 
+                              placeholder="1000" 
+                            />
                           </td>
                           <td className="px-5 py-3">
-                            <input type="number" value={v.salePrice} onChange={e => updateVariation(v.size, v.color, "salePrice", parseFloat(e.target.value) || 0)} className="w-20 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none text-green-600" placeholder="699" />
+                            <input 
+                              type="number" 
+                              value={v.salePrice ?? ""} 
+                              onChange={e => updateVariation(v.size, v.color, "salePrice", e.target.value === "" ? "" : parseFloat(e.target.value))} 
+                              className={`w-20 border transition-all rounded-lg px-3 py-2 text-xs font-bold outline-none ${
+                                v.salePrice && v.basePrice && Number(v.salePrice) >= Number(v.basePrice)
+                                  ? "bg-red-50 border-red-200 text-red-600 focus:border-red-400" 
+                                  : "bg-brand/5 border-transparent focus:border-[#C5A059]/40 text-green-600"
+                              }`} 
+                              placeholder="699" 
+                            />
                           </td>
                           <td className="px-5 py-3">
-                            <input type="number" value={v.stock} onChange={e => updateVariation(v.size, v.color, "stock", parseInt(e.target.value) || 0)} className="w-16 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" />
+                            <input type="number" value={v.stock ?? ""} onChange={e => updateVariation(v.size, v.color, "stock", e.target.value === "" ? "" : parseInt(e.target.value))} className="w-16 bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" />
                           </td>
                           <td className="px-5 py-3">
-                            <input type="text" value={v.sku} onChange={e => updateVariation(v.size, v.color, "sku", e.target.value)} placeholder={`SKU-${v.size}`} className="w-full min-w-[80px] bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" />
+                            <input type="text" value={v.sku ?? ""} onChange={e => updateVariation(v.size, v.color, "sku", e.target.value)} placeholder={`SKU-${v.size}`} className="w-full min-w-[80px] bg-brand/5 border border-transparent focus:border-[#C5A059]/40 rounded-lg px-3 py-2 text-xs font-bold outline-none" />
                           </td>
                           <td className="px-5 py-3 text-center">
                             <button 

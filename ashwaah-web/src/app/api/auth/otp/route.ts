@@ -10,7 +10,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { action, phone, otp } = body;
+    const { action, phone, otp, portal } = body;
 
     console.log(`[Auth Request ${requestId}] Action: ${action}, Phone: ${phone}`);
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
       let user = null;
       let isNewUser = false;
-      const adminPhone = "9876543210";
+      const adminPhone = "9999999999";
 
       try {
         console.log(`[Auth Request ${requestId}] Querying database for phone: ${phone}`);
@@ -95,14 +95,15 @@ export async function POST(request: Request) {
       // Session Persistence: Set a secure cookie
       try {
         const cookieStore = await cookies();
-        cookieStore.set("auth_session", phone, {
+        const cookieName = portal === "admin" ? "admin_session" : "auth_session";
+        cookieStore.set(cookieName, phone, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
           maxAge: 60 * 60 * 24 * 30, // 30 days
           path: "/",
         });
-        console.log(`[Auth Request ${requestId}] Session cookie set for ${phone}`);
+        console.log(`[Auth Request ${requestId}] ${cookieName} set for ${phone}`);
       } catch (cookieError) {
         console.error(`[Auth Request ${requestId}] Cookie Error:`, cookieError);
       }

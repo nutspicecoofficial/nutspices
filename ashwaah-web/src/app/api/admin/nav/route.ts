@@ -6,8 +6,8 @@ import { cookies } from "next/headers";
 
 async function isAdmin() {
   const cookieStore = await cookies();
-  const session = cookieStore.get("auth_session")?.value;
-  return session === "9876543210";
+  const session = cookieStore.get("admin_session")?.value;
+  return session === "9999999999";
 }
 
 export async function GET(request: Request) {

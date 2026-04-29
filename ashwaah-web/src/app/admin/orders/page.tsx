@@ -1,18 +1,111 @@
-import { ShoppingBag, Clock, CheckCircle2, Truck, Loader2 } from "lucide-react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { ShoppingBag, Clock, CheckCircle2, Truck, Loader2, User, Phone, Ruler, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+
+interface OrderItem {
+  id: number;
+  productName: string;
+  quantity: number;
+  price: number;
+  size: string;
+  color: string;
+  customizations: {
+    type: string;
+    measurements: Record<string, string>;
+  } | null;
+}
+
+interface Order {
+  id: number;
+  totalAmount: number;
+  status: string;
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  items: OrderItem[];
+}
 
 export default function AdminOrders() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const ORDER_STATUSES = [
+    "confirmed",
+    "shipped",
+    "on the way",
+    "out for delivery",
+    "delivered",
+    "cancelled"
+  ];
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch("/api/admin/orders");
+      const data = await res.json();
+      if (data.success) {
+        setOrders(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async (id: number, newStatus: string) => {
+    setUpdatingId(id);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      }
+    } catch (error) {
+      console.error("Failed to update status", error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const statusCounts = {
+    confirmed: orders.filter(o => o.status === "confirmed").length,
+    processing: orders.filter(o => ["shipped", "on the way", "out for delivery"].includes(o.status)).length,
+    completed: orders.filter(o => o.status === "delivered").length,
+    cancelled: orders.filter(o => o.status === "cancelled").length,
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40">
+        <Loader2 className="animate-spin text-brand-accent mb-4" size={40} />
+        <p className="text-brand/40 font-bold uppercase tracking-widest text-xs">Loading Orders...</p>
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="pb-20">
       <div className="mb-10">
         <h1 className="text-4xl font-playfair font-bold text-brand">Order Fulfillment</h1>
         <p className="mt-2 text-brand/60 font-medium">Track and manage customer purchases and custom fits.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
-          { label: "Pending", count: 0, icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
-          { label: "Processing", count: 0, icon: Truck, color: "text-blue-500", bg: "bg-blue-50" },
-          { label: "Completed", count: 0, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-50" },
+          { label: "Confirmed", count: statusCounts.confirmed, icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
+          { label: "Processing", count: statusCounts.processing, icon: Truck, color: "text-blue-500", bg: "bg-blue-50" },
+          { label: "Completed", count: statusCounts.completed, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-50" },
+          { label: "Cancelled", count: statusCounts.cancelled, icon: ShoppingBag, color: "text-red-500", bg: "bg-red-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white p-6 rounded-3xl border border-brand/5 shadow-sm flex items-center space-x-4">
             <div className={`p-3 rounded-2xl ${s.bg} ${s.color}`}>
@@ -26,15 +119,139 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      <div className="bg-white rounded-[2.5rem] p-20 shadow-sm border border-brand/5 text-center">
-        <div className="w-20 h-20 bg-brand/5 rounded-full flex items-center justify-center mx-auto mb-6">
-          <ShoppingBag size={40} className="text-brand/20" />
+      {orders.length === 0 ? (
+        <div className="bg-white rounded-[2.5rem] p-20 shadow-sm border border-brand/5 text-center">
+          <div className="w-20 h-20 bg-brand/5 rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShoppingBag size={40} className="text-brand/20" />
+          </div>
+          <h3 className="text-2xl font-playfair font-bold text-brand mb-2">No orders to display</h3>
+          <p className="text-brand/60 font-medium max-w-sm mx-auto">
+            When customers start placing orders for their custom-fit apparel, they will appear here.
+          </p>
         </div>
-        <h3 className="text-2xl font-playfair font-bold text-brand mb-2">No orders to display</h3>
-        <p className="text-brand/60 font-medium max-w-sm mx-auto">
-          When customers start placing orders for their custom-fit apparel, they will appear here.
-        </p>
-      </div>
+      ) : (
+        <div className="space-y-6">
+          {orders.map((order) => (
+            <div key={order.id} className="bg-white rounded-[2rem] border border-brand/5 overflow-hidden shadow-sm hover:shadow-md transition-all">
+              {/* Order Header */}
+              <div 
+                className="p-6 flex flex-col md:flex-row justify-between items-center cursor-pointer"
+                onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+              >
+                <div className="flex items-center space-x-6">
+                  <div className="bg-brand/5 p-4 rounded-2xl">
+                    <ShoppingBag className="text-brand" size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-lg font-bold text-brand">Order #{order.id}</span>
+                      <div className="relative group">
+                        <select 
+                          value={order.status}
+                          disabled={updatingId === order.id}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className={`appearance-none px-4 py-1.5 pr-10 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all border-none outline-none ${
+                            order.status === "delivered" ? "bg-green-50 text-green-600" : 
+                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
+                            "bg-amber-50 text-amber-600"
+                          } ${updatingId === order.id ? "opacity-50 animate-pulse" : ""}`}
+                        >
+                          {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-brand/40 font-medium mt-1">
+                      Placed on {new Date(order.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-10 mt-4 md:mt-0">
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-brand/40 uppercase tracking-widest mb-1">Amount</p>
+                    <p className="text-xl font-bold text-brand">₹{order.totalAmount.toLocaleString()}</p>
+                  </div>
+                  <div className="p-2 rounded-full bg-brand/5 text-brand/40">
+                    {expandedOrder === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Details (Expanded) */}
+              {expandedOrder === order.id && (
+                <div className="border-t border-brand/5 p-8 bg-brand/[0.01]">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    {/* Customer Info */}
+                    <div className="space-y-6">
+                      <h4 className="text-xs font-black text-brand uppercase tracking-widest flex items-center gap-2">
+                        <User size={14} className="text-brand-accent" /> Customer Details
+                      </h4>
+                      <div className="bg-white p-5 rounded-2xl border border-brand/5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-brand/40 uppercase">Name</span>
+                          <span className="text-xs font-black text-brand">{order.customerName || "Guest User"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-brand/40 uppercase">Phone</span>
+                          <span className="text-xs font-black text-brand flex items-center gap-1">
+                            <Phone size={10} /> {order.customerPhone}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Items */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <h4 className="text-xs font-black text-brand uppercase tracking-widest flex items-center gap-2">
+                        <Ruler size={14} className="text-brand-accent" /> Customizations & Items
+                      </h4>
+                      <div className="space-y-4">
+                        {order.items.map((item) => (
+                          <div key={item.id} className="bg-white p-6 rounded-3xl border border-brand/5 shadow-sm">
+                            <div className="flex justify-between items-start mb-6">
+                              <div>
+                                <h5 className="text-sm font-black text-brand">{item.productName}</h5>
+                                <p className="text-[10px] text-brand/40 font-bold mt-1 uppercase tracking-widest">
+                                  {item.size} / {item.color} — Qty: {item.quantity}
+                                </p>
+                              </div>
+                              <span className="text-sm font-bold text-brand">₹{item.price.toLocaleString()}</span>
+                            </div>
+
+                            {item.customizations && item.customizations.measurements && Object.keys(item.customizations.measurements).length > 0 && (
+                              <div className="bg-[#1B3022]/5 rounded-2xl p-5 border border-[#1B3022]/10">
+                                <div className="flex items-center space-x-2 mb-4">
+                                  <Sparkles size={12} className="text-[#C5A059]" />
+                                  <span className="text-[10px] font-black text-[#1B3022] uppercase tracking-[0.2em]">Bespoke Measurements (Inches)</span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                  {Object.entries(item.customizations.measurements).map(([key, val]) => (
+                                    <div key={key} className="bg-white/80 p-3 rounded-xl border border-[#1B3022]/5">
+                                      <p className="text-[8px] font-black text-brand/40 uppercase tracking-widest mb-1">{key}</p>
+                                      <p className="text-xs font-black text-brand">{val}"</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {!item.customizations?.measurements && (
+                              <div className="py-2 px-4 bg-brand/5 rounded-full inline-block">
+                                <p className="text-[10px] font-bold text-brand/40 uppercase tracking-widest">Standard Fit — No Customizations</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

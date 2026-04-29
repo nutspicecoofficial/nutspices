@@ -3,11 +3,17 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, CreditCard, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, getTotalPrice, getTotalItems } = useCartStore();
+  const { items, updateQuantity, removeItem, getTotalPrice, getTotalItems, clearCart } = useCartStore();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<"details" | "processing" | "success">("details");
+  const [orderId, setOrderId] = useState<number | null>(null);
+  const router = useRouter();
 
   // Handle hydration to avoid mismatch with SSR
   useEffect(() => {
@@ -43,8 +49,54 @@ export default function CartPage() {
   }
 
   const subtotal = getTotalPrice();
-  const shipping = 0; // Free shipping for boutique experience
+  const shipping = 0; 
   const total = subtotal + shipping;
+
+  const handleCheckout = async () => {
+    setIsCheckoutModalOpen(true);
+    setPaymentStep("details");
+  };
+
+  const processDummyPayment = async () => {
+    setIsProcessingPayment(true);
+    setPaymentStep("processing");
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          totalAmount: total,
+          paymentMethod: "online_prepaid"
+        })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setOrderId(data.orderId);
+        setPaymentStep("success");
+        clearCart();
+        
+        // Auto-navigate after 3 seconds to let them see the success state
+        setTimeout(() => {
+          router.push("/profile/orders");
+        }, 3000);
+      } else {
+        alert("Checkout failed: " + data.error);
+        setPaymentStep("details");
+        setIsProcessingPayment(false);
+      }
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      alert("Something went wrong. Please try again.");
+      setPaymentStep("details");
+      setIsProcessingPayment(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-24">
@@ -126,37 +178,155 @@ export default function CartPage() {
 
         {/* Right: Price Summary */}
         <div className="lg:col-span-4">
-          <div className="bg-[#1B3022] rounded-3xl p-8 shadow-2xl text-white sticky top-28">
-            <h2 className="text-2xl font-playfair font-bold mb-8 tracking-tight">Price Summary</h2>
+          <div className="bg-[#1B3022] rounded-3xl p-6 shadow-2xl text-white sticky top-28">
+            <h2 className="text-lg font-bold mb-6 tracking-tight uppercase border-b border-white/5 pb-4">Price Summary</h2>
             
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-between items-center text-white/60">
-                <span className="text-sm font-medium tracking-wide uppercase">Subtotal</span>
-                <span className="text-lg font-bold">₹{subtotal.toLocaleString()}</span>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center text-white/50">
+                <span className="text-[10px] font-bold tracking-widest uppercase">Subtotal</span>
+                <span className="text-sm font-bold tracking-widest">₹{subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center text-white/60 pb-4 border-b border-white/10">
-                <span className="text-sm font-medium tracking-wide uppercase">Shipping</span>
-                <span className="text-xs font-bold uppercase tracking-widest text-[#C5A059]">Free</span>
+              <div className="flex justify-between items-center text-white/50 pb-3 border-b border-white/10">
+                <span className="text-[10px] font-bold tracking-widest uppercase">Shipping</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C5A059]">Free</span>
               </div>
               <div className="flex justify-between items-center pt-2">
-                <span className="text-lg font-bold tracking-tight">Total Amount</span>
-                <span className="text-2xl font-bold text-[#C5A059]">₹{total.toLocaleString()}</span>
+                <span className="text-sm font-black tracking-widest uppercase">Total Amount</span>
+                <span className="text-lg font-black text-[#C5A059] tracking-widest">₹{total.toLocaleString()}</span>
               </div>
             </div>
 
-            <button className="w-full bg-[#C5A059] text-white py-5 rounded-2xl font-bold tracking-[0.2em] uppercase text-sm hover:bg-[#B38E46] transition-all shadow-xl flex items-center justify-center group active:scale-[0.98]">
+            <button 
+              onClick={handleCheckout}
+              className="w-full bg-[#C5A059] text-white py-4 rounded-2xl font-bold tracking-[0.2em] uppercase text-[10px] hover:bg-[#B38E46] transition-all shadow-xl flex items-center justify-center group active:scale-[0.98]"
+            >
               Proceed to Checkout
-              <ArrowRight size={18} className="ml-3 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight size={14} className="ml-3 group-hover:translate-x-1 transition-transform" />
             </button>
             
-            <div className="mt-8 flex items-center justify-center space-x-4 opacity-40">
-              <div className="text-[10px] uppercase tracking-widest font-bold">Secure Payment</div>
+            <div className="mt-6 flex items-center justify-center space-x-3 opacity-30">
+              <div className="text-[8px] uppercase tracking-[0.3em] font-black">Prepaid Only</div>
               <div className="h-1 w-1 rounded-full bg-white"></div>
-              <div className="text-[10px] uppercase tracking-widest font-bold">Safe Checkout</div>
+              <div className="text-[8px] uppercase tracking-[0.3em] font-black">Safe Checkout</div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Dummy Payment Modal */}
+      {isCheckoutModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-dark/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl relative overflow-hidden">
+            {paymentStep === "details" && (
+              <div className="animate-in zoom-in-95 duration-300">
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="p-3 bg-brand/5 rounded-2xl text-brand">
+                    <CreditCard size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-brand">Secure Checkout</h3>
+                    <p className="text-[10px] text-brand/40 font-black uppercase tracking-widest">Only Online Prepaid Payments Accepted</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-brand/5 p-6 rounded-2xl border border-brand/5">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-bold text-brand/40 uppercase tracking-widest">Order Amount</span>
+                      <span className="text-lg font-black text-brand tracking-widest">₹{total.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-[10px] font-bold text-green-600 bg-green-50 px-3 py-2 rounded-xl border border-green-100">
+                      <ShieldCheck size={14} />
+                      <span>End-to-End Encrypted Gateway</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em] border-b border-brand/5 pb-2">Select Payment Method</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      {[
+                        { label: "UPI / PhonePe / GPay", active: true },
+                        { label: "Credit / Debit Card", active: false },
+                        { label: "Net Banking", active: false },
+                      ].map((m) => (
+                        <div key={m.label} className={`p-4 rounded-xl border flex items-center justify-between ${m.active ? 'border-brand-accent bg-brand-accent/5' : 'border-brand/5 opacity-50'}`}>
+                          <span className="text-xs font-bold text-brand">{m.label}</span>
+                          {m.active && <div className="w-4 h-4 rounded-full bg-brand-accent flex items-center justify-center"><CheckCircle2 size={10} className="text-white" /></div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setIsCheckoutModalOpen(false)}
+                      className="flex-1 py-4 border-2 border-brand/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-brand/40 hover:bg-brand/5 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={processDummyPayment}
+                      className="flex-[2] py-4 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-hover shadow-lg transition-all active:scale-95"
+                    >
+                      Pay Now (Dummy)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentStep === "processing" && (
+              <div className="py-20 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
+                <div className="relative mb-10">
+                  <div className="w-24 h-24 border-4 border-brand-accent/20 rounded-full"></div>
+                  <div className="absolute inset-0 w-24 h-24 border-4 border-brand-accent border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <ShieldCheck size={32} className="text-brand-accent animate-pulse" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-playfair font-bold text-brand mb-2">Processing Payment</h3>
+                <p className="text-[10px] text-brand/40 font-black uppercase tracking-widest">Verifying with your bank...</p>
+              </div>
+            )}
+
+            {paymentStep === "success" && (
+              <div className="py-10 text-center animate-in zoom-in duration-500">
+                <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+                  <CheckCircle2 size={40} className="animate-in zoom-in duration-700" />
+                </div>
+                <h3 className="text-3xl font-playfair font-bold text-brand mb-3">Order Placed!</h3>
+                <p className="text-[10px] text-brand/40 font-black uppercase tracking-widest mb-10">Confirmation Email Sent</p>
+                
+                <div className="bg-brand/5 p-6 rounded-2xl border border-brand/5 mb-10 text-left">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-brand/40 uppercase">Order ID</span>
+                    <span className="text-sm font-black text-brand">#AS-{orderId}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-brand/40 uppercase">Payment Status</span>
+                    <span className="text-[10px] font-black text-green-600 uppercase">Paid Successfully</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <Link 
+                    href="/" 
+                    className="flex-1 py-4 border-2 border-brand/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-brand/40 hover:bg-brand/5 transition-all"
+                  >
+                    Home
+                  </Link>
+                  <Link 
+                    href="/profile/orders" 
+                    className="flex-[2] py-4 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-hover shadow-lg transition-all"
+                  >
+                    Track Order
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

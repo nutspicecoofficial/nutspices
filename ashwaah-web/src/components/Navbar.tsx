@@ -19,10 +19,6 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   
-  // Hide Navbar for Admin Portal
-  if (pathname.startsWith("/admin")) {
-    return null;
-  }
 
   const [navItems, setNavItems] = useState<NavItem[]>([]);
 
@@ -111,15 +107,20 @@ export default function Navbar() {
     }
   };
 
+  // Hide Navbar for Admin Portal
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full bg-[#1B3022] border-b border-white/10 shadow-lg font-inter">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center h-16">
             
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="font-playfair text-3xl font-bold text-white tracking-tighter hover:text-[#C5A059] transition-colors">
+              <Link href="/" className="font-playfair text-2xl font-bold text-white tracking-tighter hover:text-[#C5A059] transition-colors">
                 Ashwaah
               </Link>
             </div>
@@ -137,7 +138,7 @@ export default function Navbar() {
                     <Link
                       key={item.id}
                       href={item.href}
-                      className={`text-sm font-bold uppercase tracking-widest transition-all duration-300 relative group py-1 ${
+                      className={`text-xs font-bold uppercase tracking-widest transition-all duration-300 relative group py-1 ${
                         isActive ? "text-[#C5A059]" : "text-white hover:text-[#C5A059]"
                       }`}
                     >
@@ -154,7 +155,7 @@ export default function Navbar() {
             {/* User Actions */}
             <div className="hidden md:flex items-center space-x-8 text-white">
               <button aria-label="Search" className="hover:text-[#C5A059] transition-colors p-2">
-                <Search className="h-5 w-5" />
+                <Search className="h-4 w-4" />
               </button>
               
               {user ? (
@@ -170,8 +171,8 @@ export default function Navbar() {
               )}
 
               <Link href="/cart" aria-label="Cart" className="hover:text-[#C5A059] transition-colors relative p-2">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="absolute top-0 right-0 bg-[#C5A059] text-white text-[9px] font-black h-4 w-4 rounded-full flex items-center justify-center border-2 border-[#1B3022]">
+                <ShoppingCart className="h-4 w-4" />
+                <span className="absolute top-0 right-0 bg-[#C5A059] text-white text-[8px] font-black h-3.5 w-3.5 rounded-full flex items-center justify-center border-2 border-[#1B3022]">
                   {cartCount}
                 </span>
               </Link>
