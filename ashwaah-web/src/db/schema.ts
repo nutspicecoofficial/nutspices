@@ -23,6 +23,7 @@ export const products = sqliteTable("products", {
   category: text("category"),
   tags: text("tags"),       // comma-separated tags
   isFeatured: integer("is_featured", { mode: "boolean" }).default(false),
+  isCustomizable: integer("is_customizable", { mode: "boolean" }).default(false),
   enabledMeasurements: text("enabled_measurements"), // JSON string array
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
 });

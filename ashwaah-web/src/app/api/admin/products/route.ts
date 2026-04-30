@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { products, productVariations } from "@/db/schema";
+import { products, productVariations, orderItems, cartItems } from "@/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 
@@ -69,7 +69,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { 
       name, description, salePrice, images, variations,
-      avgRating, numReviews, category, gender, colors, tags, isFeatured, enabledMeasurements
+      avgRating, numReviews, category, gender, colors, tags, isFeatured, 
+      isCustomizable, enabledMeasurements
     } = body;
 
     // Validation
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
         gender: (gender as "men" | "women" | "unisex") || "unisex",
         tags: tags || null,
         isFeatured: !!isFeatured,
+        isCustomizable: !!isCustomizable,
         enabledMeasurements: enabledMeasurements || null,
       }).returning().all();
 
@@ -140,7 +142,8 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { 
       id, name, description, salePrice, images, variations,
-      avgRating, numReviews, category, gender, colors, tags, isFeatured, enabledMeasurements
+      avgRating, numReviews, category, gender, colors, tags, isFeatured, 
+      isCustomizable, enabledMeasurements
     } = body;
 
     if (!id) return NextResponse.json({ success: false, error: "ID is required" }, { status: 400 });
@@ -164,6 +167,7 @@ export async function PATCH(request: Request) {
         gender: gender || "unisex",
         tags: tags || null,
         isFeatured: !!isFeatured,
+        isCustomizable: !!isCustomizable,
         enabledMeasurements: enabledMeasurements || null,
       }).where(eq(products.id, id)).run();
 
@@ -206,13 +210,36 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = parseInt(searchParams.get("id") || "0");
-    
-    // Cascading delete is handled by schema (onDelete: "cascade")
-    await db.delete(products).where(eq(products.id, id));
+
+    if (!id) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
+
+    // 1. Check if product exists in orders
+    const hasOrders = await db.select().from(orderItems).where(eq(orderItems.productId, id)).limit(1);
+    if (hasOrders.length > 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Cannot delete product with existing orders. Please disable it instead (coming soon)." 
+      }, { status: 400 });
+    }
+
+    // 2. Perform deletion in transaction
+    db.transaction((tx) => {
+      // Delete variations
+      tx.delete(productVariations).where(eq(productVariations.productId, id)).run();
+      // Delete from cart
+      tx.delete(cartItems).where(eq(cartItems.productId, id)).run();
+      // Finally delete product
+      tx.delete(products).where(eq(products.id, id)).run();
+    });
+
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ success: false, error: "Failed to delete product" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Delete Product Error:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: "Failed to delete product",
+      details: error.message 
+    }, { status: 500 });
   }
 }
 

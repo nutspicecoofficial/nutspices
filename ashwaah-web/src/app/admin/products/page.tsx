@@ -48,6 +48,7 @@ export default function ProductManagement() {
   const [avgRating, setAvgRating] = useState("4.3");
   const [numReviews, setNumReviews] = useState("1");
   const [isFeatured, setIsFeatured] = useState(false);
+  const [isCustomizable, setIsCustomizable] = useState(false);
   const [tags, setTags] = useState("");
   const [enabledMeasurements, setEnabledMeasurements] = useState<string[]>([]);
   const [pendingColor, setPendingColor] = useState("#C5A059");
@@ -125,7 +126,7 @@ export default function ProductManagement() {
     setEditingId(null);
     setName(""); setDescription(""); setGender("unisex"); setCategory("");
     setAvgRating("4.3"); setNumReviews("1");
-    setIsFeatured(false); setTags(""); setImages([]);
+    setIsFeatured(false); setIsCustomizable(false); setTags(""); setImages([]);
     setSelectedSizes([]); setSelectedColors([]); setVariations([]);
     setEnabledMeasurements([]);
   };
@@ -146,6 +147,7 @@ export default function ProductManagement() {
         setAvgRating((p.avgRating ?? 4.3).toString());
         setNumReviews((p.numReviews ?? 1).toString());
         setIsFeatured(!!p.isFeatured);
+        setIsCustomizable(!!p.isCustomizable);
         setTags(p.tags || "");
         setImages(JSON.parse(p.images || "[]"));
         
@@ -193,6 +195,7 @@ export default function ProductManagement() {
       const payload = { 
         id: editingId, name, description, images, variations, 
         avgRating, numReviews, category, gender, colors: selectedColors, tags, isFeatured,
+        isCustomizable,
         enabledMeasurements: JSON.stringify(enabledMeasurements)
       };
       
@@ -317,48 +320,64 @@ export default function ProductManagement() {
                 Customization Settings
               </h3>
               <div className="bg-brand/5 rounded-[2.5rem] p-8 border border-brand/10">
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="p-3 bg-brand/10 rounded-2xl text-brand">
-                    <Scissors size={20} />
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-brand/10 rounded-2xl text-brand">
+                      <Scissors size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-brand uppercase tracking-widest">Enable Custom Fit</p>
+                      <p className="text-[10px] text-brand/40 font-medium">Allow users to provide bespoke measurements for this product</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-black text-brand uppercase tracking-widest">Enable Custom Fit</p>
-                    <p className="text-[10px] text-brand/40 font-medium">Select measurements users can provide for this product</p>
-                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsCustomizable(!isCustomizable)} 
+                    className={`w-14 h-7 rounded-full transition-all relative flex items-center px-1 ${isCustomizable ? "bg-brand-accent shadow-[0_0_15px_rgba(197,160,89,0.3)]" : "bg-brand/20"}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white shadow-lg transition-transform duration-300 ease-out ${isCustomizable ? "translate-x-7" : "translate-x-0"}`} />
+                  </button>
                 </div>
 
-                {gender === "unisex" ? (
-                  <div className="py-4 text-center text-brand/30 bg-white/50 rounded-2xl border border-dashed border-brand/10">
-                    <p className="text-[10px] font-bold uppercase tracking-widest">Please select Men or Women gender to configure measurements</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {(gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS).map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => toggleMeasurement(m)}
-                        className={`flex items-center space-x-3 p-4 rounded-2xl border transition-all ${
-                          enabledMeasurements.includes(m)
-                            ? "bg-brand text-white border-brand shadow-lg"
-                            : "bg-white text-brand/60 border-brand/5 hover:border-brand/20"
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                          enabledMeasurements.includes(m) ? "bg-white border-white text-brand" : "bg-brand/5 border-brand/10"
-                        }`}>
-                          {enabledMeasurements.includes(m) && <Check size={12} strokeWidth={4} />}
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest truncate">{m}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                {enabledMeasurements.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-brand/10 flex items-center justify-between">
-                    <span className="text-[10px] font-black text-brand/40 uppercase tracking-widest">Total Enabled: {enabledMeasurements.length}</span>
-                    <button type="button" onClick={() => setEnabledMeasurements([])} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors">Clear All</button>
+                {isCustomizable && (
+                  <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="mb-4">
+                      <p className="text-[10px] font-black text-brand/40 uppercase tracking-widest mb-4 border-b border-brand/5 pb-2">Select measurements to capture from user</p>
+                    </div>
+                    {gender === "unisex" ? (
+                      <div className="py-8 text-center text-brand/30 bg-white/50 rounded-2xl border border-dashed border-brand/10">
+                        <p className="text-[10px] font-bold uppercase tracking-widest">Please select Men or Women gender to configure measurements</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {(gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS).map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => toggleMeasurement(m)}
+                            className={`flex items-center space-x-3 p-4 rounded-2xl border transition-all ${
+                              enabledMeasurements.includes(m)
+                                ? "bg-brand text-white border-brand shadow-lg"
+                                : "bg-white text-brand/60 border-brand/5 hover:border-brand/20"
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                              enabledMeasurements.includes(m) ? "bg-white border-white text-brand" : "bg-brand/5 border-brand/10"
+                            }`}>
+                              {enabledMeasurements.includes(m) && <Check size={12} strokeWidth={4} />}
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest truncate">{m}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {enabledMeasurements.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-brand/10 flex items-center justify-between">
+                        <span className="text-[10px] font-black text-brand/40 uppercase tracking-widest">Total Enabled: {enabledMeasurements.length}</span>
+                        <button type="button" onClick={() => setEnabledMeasurements([])} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors">Clear All</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

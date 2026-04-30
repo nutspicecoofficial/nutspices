@@ -34,11 +34,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // 3. Protect Product Routes
+  if (pathname.startsWith('/product/') && !session) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
 
-  
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/login', '/admin/:path*'], // Add more protected routes here
+  matcher: ['/login', '/admin/:path*', '/product/:path*'],
 }

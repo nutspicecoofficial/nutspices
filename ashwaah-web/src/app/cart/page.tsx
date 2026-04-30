@@ -109,7 +109,7 @@ export default function CartPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         {/* Left: Cart Items List */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="lg:col-span-8 space-y-6 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-4 custom-scrollbar">
           {items.map((item) => (
             <div key={item.id} className="bg-white rounded-3xl p-6 shadow-sm border border-brand/5 flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 hover:shadow-md transition-shadow">
               {/* Product Image */}

@@ -49,10 +49,15 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           const data = await res.json();
           setProduct(data);
           
-          // Set initial color if available
+          // Set initial color and size if available
           const uniqueColors = Array.from(new Set(data.variations.map((v: Variation) => v.color)));
           if (uniqueColors.length > 0) {
-            setSelectedColor(uniqueColors[0] as string);
+            const firstColor = uniqueColors[0] as string;
+            setSelectedColor(firstColor);
+            
+            // Also set first size for that color
+            const firstSize = data.variations.find((v: Variation) => v.color === firstColor)?.size;
+            if (firstSize) setSelectedSize(firstSize);
           }
           
           // Set initial main image
@@ -119,7 +124,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
       setToast("Please select a size first");
       return;
     }
-    if (!currentVariation) return;
+    if (!currentVariation) {
+      setToast("The selected combination is currently unavailable.");
+      return;
+    }
 
     // Create a unique ID/hash for this item including customizations
     const customHash = Object.keys(measurements).length > 0 
@@ -289,7 +297,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* Customisation Tooltip/Banner */}
-            {enabledMeasurementsList.length === 0 && (
+            {product.isCustomizable && enabledMeasurementsList.length === 0 && (
               <div className="mb-10 p-5 rounded-2xl bg-brand/5 border border-brand/5 flex items-center justify-between group cursor-pointer hover:bg-brand/10 transition-all" onClick={() => setDrawerOpen(true)}>
                 <div className="flex items-center space-x-4">
                   <div className="bg-white p-3 rounded-xl text-brand-accent shadow-sm group-hover:scale-110 transition-transform">
@@ -307,7 +315,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             )}
 
             {/* Custom Fit Section */}
-            {enabledMeasurementsList.length > 0 && (
+            {product.isCustomizable && enabledMeasurementsList.length > 0 && (
               <div className="mb-12">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center space-x-3">
@@ -357,9 +365,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                     : "bg-brand text-white hover:bg-brand-hover active:scale-[0.98] border border-transparent hover:border-brand-accent"
                 }`}
               >
-                <ShoppingBag size={22} className={added ? "scale-0 opacity-0" : "scale-100 opacity-100 transition-all"} />
-                {added && <Check size={22} className="absolute scale-110 text-brand-accent animate-in zoom-in duration-300" />}
-                <span className={added ? "text-brand-accent" : ""}>
+                {added ? (
+                  <Check size={22} className="text-brand-accent animate-in zoom-in duration-300" />
+                ) : (
+                  <ShoppingBag size={22} className="transition-all" />
+                )}
+                <span className={added ? "text-brand-accent transition-colors duration-300" : ""}>
                   {selectedColor && selectedSize && currentStock === 0 ? "Out of Stock" : added ? "Added to Bag!" : "Add to Bag"}
                 </span>
               </button>

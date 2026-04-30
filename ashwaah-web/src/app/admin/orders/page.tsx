@@ -33,6 +33,7 @@ export default function AdminOrders() {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const ORDER_STATUSES = [
+    "pending",
     "confirmed",
     "shipped",
     "on the way",
@@ -78,10 +79,23 @@ export default function AdminOrders() {
   };
 
   const statusCounts = {
-    confirmed: orders.filter(o => o.status === "confirmed").length,
+    confirmed: orders.filter(o => o.status === "confirmed" || o.status === "pending").length,
     processing: orders.filter(o => ["shipped", "on the way", "out for delivery"].includes(o.status)).length,
     completed: orders.filter(o => o.status === "delivered").length,
     cancelled: orders.filter(o => o.status === "cancelled").length,
+  };
+
+  const getStatusStyles = (status: string) => {
+    switch (status) {
+      case "pending": return "bg-gray-100 text-gray-600 border-gray-200";
+      case "confirmed": return "bg-blue-50 text-blue-600 border-blue-100";
+      case "shipped": return "bg-indigo-50 text-indigo-600 border-indigo-100";
+      case "on the way": return "bg-cyan-50 text-cyan-600 border-cyan-100";
+      case "out for delivery": return "bg-purple-50 text-purple-600 border-purple-100";
+      case "delivered": return "bg-green-50 text-green-600 border-green-100";
+      case "cancelled": return "bg-red-50 text-red-600 border-red-100";
+      default: return "bg-amber-50 text-amber-600 border-amber-100";
+    }
   };
 
   if (loading) {
@@ -130,37 +144,44 @@ export default function AdminOrders() {
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-[2rem] border border-brand/5 overflow-hidden shadow-sm hover:shadow-md transition-all">
+        <div className="flex flex-col gap-6">
+          {orders.map((order) => {
+            const isCustomized = order.items.some(item => item.customizations && item.customizations.measurements && Object.keys(item.customizations.measurements).length > 0);
+            
+            return (
+            <div key={order.id} className={`rounded-[2rem] border overflow-hidden shadow-sm hover:shadow-md transition-all ${isCustomized ? 'bg-[#F9F6EE] border-[#C5A059]/30' : 'bg-white border-brand/5'}`}>
               {/* Order Header */}
               <div 
                 className="p-6 flex flex-col md:flex-row justify-between items-center cursor-pointer"
                 onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
               >
-                <div className="flex items-center space-x-6">
-                  <div className="bg-brand/5 p-4 rounded-2xl">
-                    <ShoppingBag className="text-brand" size={24} />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-lg font-bold text-brand">Order #{order.id}</span>
-                      <div className="relative group">
-                        <select 
-                          value={order.status}
-                          disabled={updatingId === order.id}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          className={`appearance-none px-4 py-1.5 pr-10 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all border-none outline-none ${
-                            order.status === "delivered" ? "bg-green-50 text-green-600" : 
-                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
-                            "bg-amber-50 text-amber-600"
-                          } ${updatingId === order.id ? "opacity-50 animate-pulse" : ""}`}
-                        >
-                          {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
-                      </div>
-                    </div>
+          <div className="flex items-center space-x-6">
+            <div className="bg-brand/5 p-4 rounded-2xl">
+              <ShoppingBag className="text-brand" size={24} />
+            </div>
+            <div>
+              <div className="flex items-center space-x-3">
+                <span className="text-lg font-bold text-brand">Order #{order.id}</span>
+                <div className="relative group">
+                  <select 
+                    value={order.status}
+                    disabled={updatingId === order.id}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      updateOrderStatus(order.id, e.target.value);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`appearance-none px-4 py-1.5 pr-10 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all border outline-none ${getStatusStyles(order.status)} ${updatingId === order.id ? "opacity-50 animate-pulse" : ""}`}
+                  >
+                    {ORDER_STATUSES.map(s => (
+                      <option key={s} value={s} className={getStatusStyles(s)}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
+                </div>
+              </div>
                     <p className="text-xs text-brand/40 font-medium mt-1">
                       Placed on {new Date(order.createdAt).toLocaleDateString()}
                     </p>
@@ -249,7 +270,8 @@ export default function AdminOrders() {
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
     </div>
