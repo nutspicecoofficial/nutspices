@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, Clock, CheckCircle2, Truck, Loader2, User, Phone, Ruler, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { ShoppingBag, Clock, CheckCircle2, Truck, Loader2, User, Phone, Ruler, ChevronDown, ChevronUp, Sparkles, Scissors, MapPin } from "lucide-react";
 
 interface OrderItem {
   id: number;
@@ -23,6 +23,7 @@ interface Order {
   createdAt: string;
   customerName: string;
   customerPhone: string;
+  shippingAddress: string;
   items: OrderItem[];
 }
 
@@ -31,10 +32,12 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const ORDER_STATUSES = [
     "pending",
     "confirmed",
+    "processing",
     "shipped",
     "on the way",
     "out for delivery",
@@ -79,16 +82,27 @@ export default function AdminOrders() {
   };
 
   const statusCounts = {
-    confirmed: orders.filter(o => o.status === "confirmed" || o.status === "pending").length,
-    processing: orders.filter(o => ["shipped", "on the way", "out for delivery"].includes(o.status)).length,
-    completed: orders.filter(o => o.status === "delivered").length,
-    cancelled: orders.filter(o => o.status === "cancelled").length,
+    pending: orders.filter(o => o.status?.toLowerCase() === "pending").length,
+    confirmed: orders.filter(o => o.status?.toLowerCase() === "confirmed").length,
+    processing: orders.filter(o => ["processing", "shipped", "on the way", "out for delivery"].includes(o.status?.toLowerCase())).length,
+    completed: orders.filter(o => o.status?.toLowerCase() === "delivered").length,
+    cancelled: orders.filter(o => o.status?.toLowerCase() === "cancelled").length,
   };
+
+  const filteredOrders = orders.filter(order => {
+    const s = searchTerm.toLowerCase();
+    return (
+      order.id.toString().includes(s) ||
+      order.customerPhone?.includes(s) ||
+      (order.customerName || "").toLowerCase().includes(s)
+    );
+  });
 
   const getStatusStyles = (status: string) => {
     switch (status) {
-      case "pending": return "bg-gray-100 text-gray-600 border-gray-200";
+      case "pending": return "bg-amber-50 text-amber-600 border-amber-100";
       case "confirmed": return "bg-blue-50 text-blue-600 border-blue-100";
+      case "processing": return "bg-indigo-50 text-indigo-600 border-indigo-100";
       case "shipped": return "bg-indigo-50 text-indigo-600 border-indigo-100";
       case "on the way": return "bg-cyan-50 text-cyan-600 border-cyan-100";
       case "out for delivery": return "bg-purple-50 text-purple-600 border-purple-100";
@@ -109,16 +123,30 @@ export default function AdminOrders() {
 
   return (
     <div className="pb-20">
-      <div className="mb-10">
-        <h1 className="text-4xl font-playfair font-bold text-brand">Order Fulfillment</h1>
-        <p className="mt-2 text-brand/60 font-medium">Track and manage customer purchases and custom fits.</p>
+      <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div>
+          <h1 className="text-4xl font-playfair font-bold text-brand">Order Fulfillment</h1>
+          <p className="mt-2 text-brand/60 font-medium">Track and manage customer purchases and custom fits.</p>
+        </div>
+
+        <div className="relative group min-w-[300px]">
+          <ShoppingBag className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30 group-focus-within:text-[#C5A059] transition-colors" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search by order # or mobile..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-brand/10 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold text-brand focus:outline-none focus:ring-4 focus:ring-[#C5A059]/5 transition-all shadow-sm"
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {[
-          { label: "Confirmed", count: statusCounts.confirmed, icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
-          { label: "Processing", count: statusCounts.processing, icon: Truck, color: "text-blue-500", bg: "bg-blue-50" },
-          { label: "Completed", count: statusCounts.completed, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-50" },
+          { label: "Pending", count: statusCounts.pending, icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
+          { label: "Confirmed", count: statusCounts.confirmed, icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-50" },
+          { label: "Processing", count: statusCounts.processing, icon: Truck, color: "text-indigo-500", bg: "bg-indigo-50" },
+          { label: "Completed", count: statusCounts.completed, icon: ShoppingBag, color: "text-green-500", bg: "bg-green-50" },
           { label: "Cancelled", count: statusCounts.cancelled, icon: ShoppingBag, color: "text-red-500", bg: "bg-red-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white p-6 rounded-3xl border border-brand/5 shadow-sm flex items-center space-x-4">
@@ -133,23 +161,23 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      {orders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <div className="bg-white rounded-[2.5rem] p-20 shadow-sm border border-brand/5 text-center">
           <div className="w-20 h-20 bg-brand/5 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShoppingBag size={40} className="text-brand/20" />
           </div>
-          <h3 className="text-2xl font-playfair font-bold text-brand mb-2">No orders to display</h3>
+          <h3 className="text-2xl font-playfair font-bold text-brand mb-2">{searchTerm ? "No matching orders" : "No orders to display"}</h3>
           <p className="text-brand/60 font-medium max-w-sm mx-auto">
-            When customers start placing orders for their custom-fit apparel, they will appear here.
+            {searchTerm ? "Adjust your search filters to find what you are looking for." : "When customers start placing orders for their custom-fit apparel, they will appear here."}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          {orders.map((order) => {
-            const isCustomized = order.items.some(item => item.customizations && item.customizations.measurements && Object.keys(item.customizations.measurements).length > 0);
+          {filteredOrders.map((order) => {
+            const hasBespokeItems = order.items.some(item => item.customizations?.type === "Bespoke" || (item.customizations?.measurements && Object.keys(item.customizations.measurements).length > 0));
             
             return (
-            <div key={order.id} className={`rounded-[2rem] border overflow-hidden shadow-sm hover:shadow-md transition-all ${isCustomized ? 'bg-[#F9F6EE] border-[#C5A059]/30' : 'bg-white border-brand/5'}`}>
+            <div key={order.id} className={`rounded-[2rem] border overflow-hidden shadow-sm hover:shadow-md transition-all ${hasBespokeItems ? 'bg-[#F9F6EE] border-[#C5A059]/30 ring-1 ring-[#C5A059]/10' : 'bg-white border-brand/5'}`}>
               {/* Order Header */}
               <div 
                 className="p-6 flex flex-col md:flex-row justify-between items-center cursor-pointer"
@@ -162,6 +190,12 @@ export default function AdminOrders() {
             <div>
               <div className="flex items-center space-x-3">
                 <span className="text-lg font-bold text-brand">Order #{order.id}</span>
+                {hasBespokeItems && (
+                  <div className="flex items-center space-x-1 px-3 py-1 bg-[#C5A059] text-white rounded-full">
+                    <Scissors size={10} />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Bespoke Order</span>
+                  </div>
+                )}
                 <div className="relative group">
                   <select 
                     value={order.status}
@@ -218,6 +252,18 @@ export default function AdminOrders() {
                           <span className="text-xs font-black text-brand flex items-center gap-1">
                             <Phone size={10} /> {order.customerPhone}
                           </span>
+                        </div>
+                      </div>
+
+                      {/* Shipping Address */}
+                      <div className="space-y-6 pt-4">
+                        <h4 className="text-xs font-black text-brand uppercase tracking-widest flex items-center gap-2">
+                          <MapPin size={14} className="text-brand-accent" /> Delivery Address
+                        </h4>
+                        <div className="bg-white p-5 rounded-2xl border border-brand/5">
+                          <p className="text-xs font-bold text-brand/70 leading-relaxed">
+                            {order.shippingAddress || "No address provided"}
+                          </p>
                         </div>
                       </div>
                     </div>

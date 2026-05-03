@@ -26,6 +26,7 @@ export async function GET() {
       id: orders.id,
       totalAmount: orders.totalAmount,
       status: orders.status,
+      shippingAddress: orders.shippingAddress,
       createdAt: orders.createdAt,
     })
     .from(orders)
@@ -38,6 +39,7 @@ export async function GET() {
         id: orderItems.id,
         productId: orderItems.productId,
         productName: products.name,
+        productImage: products.images,
         quantity: orderItems.quantity,
         price: orderItems.price,
         size: orderItems.size,
@@ -50,10 +52,25 @@ export async function GET() {
 
       return {
         ...order,
-        items: items.map(item => ({
-          ...item,
-          customizations: item.customizations ? JSON.parse(item.customizations) : null
-        }))
+        items: items.map(item => {
+          let imageUrl = "/placeholder-product.png";
+          try {
+            if (item.productImage) {
+              const parsed = typeof item.productImage === 'string' ? JSON.parse(item.productImage) : item.productImage;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                imageUrl = parsed[0];
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing product images for item:", item.id, e);
+          }
+          
+          return {
+            ...item,
+            productImage: imageUrl,
+            customizations: item.customizations ? JSON.parse(item.customizations) : null
+          };
+        })
       };
     }));
 

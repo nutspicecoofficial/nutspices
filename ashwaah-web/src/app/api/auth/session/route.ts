@@ -21,7 +21,9 @@ export async function GET() {
     const user = userResult[0];
 
     if (!user) {
-      return NextResponse.json({ authenticated: false });
+      const response = NextResponse.json({ authenticated: false });
+      response.cookies.delete("auth_session");
+      return response;
     }
 
     return NextResponse.json({ 

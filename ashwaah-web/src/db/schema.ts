@@ -5,7 +5,17 @@ export const users = sqliteTable("users", {
   phoneNumber: text("phone_number").notNull().unique(),
   fullName: text("full_name"),
   role: text("role").default("user"), // user, admin
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  address: text("address"), // Default shipping address
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  lastLoginAt: text("last_login_at"),
+});
+
+export const otpVerifications = sqliteTable("otp_verifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  phoneNumber: text("phone_number").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 
@@ -25,7 +35,7 @@ export const products = sqliteTable("products", {
   isFeatured: integer("is_featured", { mode: "boolean" }).default(false),
   isCustomizable: integer("is_customizable", { mode: "boolean" }).default(false),
   enabledMeasurements: text("enabled_measurements"), // JSON string array
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 export const productVariations = sqliteTable("product_variations", {
@@ -84,7 +94,7 @@ export const orders = sqliteTable("orders", {
   totalAmount: real("total_amount").notNull(),
   status: text("status").default("pending"), // pending, processing, shipped, delivered, cancelled
   shippingAddress: text("shipping_address"),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 export const orderItems = sqliteTable("order_items", {

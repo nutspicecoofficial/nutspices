@@ -13,6 +13,15 @@ export default function Login() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timer > 0 && step === "otp") {
+      interval = setInterval(() => setTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer, step]);
 
   // Step 1: Handle Phone Input (Numeric only, max 10)
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,16 +47,20 @@ export default function Login() {
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "send", phone }),
       });
       const data = await res.json();
+      
       if (data.success) {
         setStep("otp");
+        setTimer(60);
       } else {
         setError(data.error || "Failed to send OTP");
       }
-    } catch (err) {
-      setError("Something went wrong. Please try again.");
+    } catch (err: any) {
+      console.error("OTP Error:", err);
+      setError("Failed to connect to authentication server.");
     } finally {
       setLoading(false);
     }
@@ -63,6 +76,7 @@ export default function Login() {
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify", phone, otp }),
       });
       const data = await res.json();
@@ -75,10 +89,11 @@ export default function Login() {
           router.refresh();
         }
       } else {
-        setError(data.error || "Invalid OTP");
+        setError(data.error || "Invalid OTP. Please try again.");
       }
-    } catch (err) {
-      setError("Verification failed. Please try again.");
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setError("Failed to verify OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -113,7 +128,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-brand-light flex flex-col justify-center items-center p-4 selection:bg-brand-accent/30 font-inter">
-      
       <div className="absolute top-8 left-8">
         <Link href="/" className="inline-flex items-center space-x-2 text-brand/60 hover:text-brand transition text-sm font-medium">
           <ArrowLeft size={16} />
@@ -195,7 +209,14 @@ export default function Login() {
               </div>
               <div className="flex justify-between mt-4 px-1">
                 <button type="button" onClick={() => setStep("phone")} className="text-xs text-brand/40 hover:text-brand font-bold transition-colors">Change Number</button>
-                <button type="button" className="text-xs text-brand-accent hover:underline font-bold">Resend Code</button>
+                <button 
+                  type="button" 
+                  onClick={handleSendOTP}
+                  disabled={timer > 0 || loading}
+                  className={`text-xs font-bold ${timer > 0 ? "text-brand/30 cursor-not-allowed" : "text-brand-accent hover:underline"}`}
+                >
+                  {timer > 0 ? `Resend in ${timer}s` : "Resend Code"}
+                </button>
               </div>
             </div>
             <button 

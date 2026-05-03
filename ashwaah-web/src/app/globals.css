@@ -33,3 +33,13 @@ body {
   @apply bg-brand/20 rounded-full hover:bg-brand/30 transition-colors;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+

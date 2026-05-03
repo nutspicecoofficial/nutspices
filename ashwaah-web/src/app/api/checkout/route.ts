@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
   try {
-    const { items, totalAmount, paymentMethod } = await req.json();
+    const { items, totalAmount, paymentMethod, shippingAddress } = await req.json();
     const cookieStore = await cookies();
     const phoneNumber = cookieStore.get("auth_session")?.value;
 
@@ -23,13 +23,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
+    // Append new address to user's saved addresses
+    if (shippingAddress) {
+      let addresses: string[] = [];
+      if (user.address) {
+        try {
+          addresses = JSON.parse(user.address);
+          if (!Array.isArray(addresses)) addresses = [user.address];
+        } catch {
+          addresses = [user.address];
+        }
+      }
+      if (!addresses.includes(shippingAddress)) {
+        addresses.push(shippingAddress);
+        await db.update(users)
+          .set({ address: JSON.stringify(addresses) })
+          .where(eq(users.id, user.id));
+      }
+    }
+
     // Create Order
     const [newOrder] = await db.insert(orders).values({
       userId: user.id,
       totalAmount: totalAmount,
-      status: "processing", // Initial status after payment
-      shippingAddress: "Default Boutique Address", // Simplified for now
-      createdAt: new Date(),
+      status: "pending", // Initial status after payment
+      shippingAddress: shippingAddress,
+      createdAt: new Date().toISOString(),
     }).returning();
 
     // Create Order Items

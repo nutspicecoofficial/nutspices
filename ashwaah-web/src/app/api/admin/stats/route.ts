@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, products, cartItems } from "@/db/schema";
-import { count } from "drizzle-orm";
+import { users, products, orders } from "@/db/schema";
+import { count, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 async function isAuthenticated() {
@@ -16,17 +16,24 @@ export async function GET() {
   }
 
   try {
-    const userCountResult = await db.select({ value: count() }).from(users);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const userCountResult = await db.select({ value: count() }).from(users).where(sql`${users.createdAt} >= ${startOfMonth}`);
     const productCountResult = await db.select({ value: count() }).from(products);
-    // For orders, we'll use cartItems as a placeholder count for now
-    const orderCountResult = await db.select({ value: count() }).from(cartItems);
+    const orderCountResult = await db.select({ value: count() }).from(orders).where(sql`${orders.createdAt} >= ${startOfMonth}`);
+    
+    const revenueResult = await db.select({ 
+      value: sql<number>`SUM(${orders.totalAmount})`.mapWith(Number) 
+    }).from(orders).where(sql`${orders.createdAt} >= ${startOfMonth}`);
 
     return NextResponse.json({
       success: true,
       stats: {
         totalUsers: userCountResult[0].value,
-        totalProducts: productCountResult[0].value,
+        totalProducts: productCountResult[0].value, // Keep total products
         totalOrders: orderCountResult[0].value,
+        totalRevenue: revenueResult[0].value || 0,
       }
     });
   } catch (error) {

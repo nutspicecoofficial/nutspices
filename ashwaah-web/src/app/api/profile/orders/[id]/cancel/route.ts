@@ -37,8 +37,8 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    // Only allow cancellation if order is not shipped yet
-    const cancellableStatuses = ["pending", "processing", "confirmed"];
+    // Only allow cancellation if order is still pending
+    const cancellableStatuses = ["pending"];
     if (!cancellableStatuses.includes(order.status || "")) {
       return NextResponse.json({ 
         success: false, 

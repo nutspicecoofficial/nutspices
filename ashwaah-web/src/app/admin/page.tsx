@@ -15,6 +15,7 @@ type Stats = {
   totalUsers: number;
   totalProducts: number;
   totalOrders: number;
+  totalRevenue: number;
 };
 
 export default function AdminDashboard() {
@@ -59,9 +60,17 @@ export default function AdminDashboard() {
       label: "Total Orders", 
       value: stats?.totalOrders || 0, 
       icon: ShoppingBag, 
-      color: "bg-brand-accent", 
+      color: "bg-[#C5A059]", 
       bg: "bg-[#C5A059]/10",
       trend: "+5% from yesterday"
+    },
+    { 
+      label: "Total Revenue", 
+      value: `₹${(stats?.totalRevenue || 0).toLocaleString()}`, 
+      icon: TrendingUp, 
+      color: "bg-orange-500", 
+      bg: "bg-orange-50",
+      trend: "Revenue growing"
     },
     { 
       label: "Active Products", 
@@ -83,28 +92,28 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <div key={stat.label} className="bg-white rounded-[2rem] p-8 shadow-sm border border-brand/5 hover:shadow-xl hover:-translate-y-1 transition-all group">
               <div className="flex items-start justify-between mb-6">
-                <div className={`p-4 rounded-2xl ${stat.bg} ${stat.color.replace('bg-', 'text-')} group-hover:scale-110 transition-transform`}>
-                  <Icon size={24} />
+                <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color.replace('bg-', 'text-')} group-hover:bg-brand group-hover:text-white transition-all duration-500`}>
+                  <Icon size={20} />
                 </div>
-                <div className="flex items-center text-xs font-bold text-green-500 bg-green-50 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  <TrendingUp size={12} className="mr-1" />
+                <div className="flex items-center text-[9px] font-black text-green-500 bg-green-500/5 px-2.5 py-1 rounded-full uppercase tracking-widest border border-green-500/10">
+                  <div className="w-1 h-1 bg-green-500 rounded-full mr-1.5 animate-pulse" />
                   Live
                 </div>
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-brand/40 uppercase tracking-[0.2em]">{stat.label}</h3>
+                <h3 className="text-[10px] font-black text-brand/30 uppercase tracking-[0.2em] mb-1">{stat.label}</h3>
                 <div className="flex items-baseline space-x-2">
-                  <span className="text-5xl font-playfair font-bold text-brand">{stat.value}</span>
-                  <ArrowUpRight size={20} className="text-[#C5A059] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="text-4xl font-bold text-brand tracking-tighter font-sans">{stat.value}</span>
+                  <ArrowUpRight size={16} className="text-[#C5A059] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
-              <p className="mt-6 text-[10px] font-bold text-brand/40 uppercase tracking-widest border-t border-brand/5 pt-4">
+              <p className="mt-4 text-[9px] font-black text-brand/20 uppercase tracking-[0.15em]">
                 {stat.trend}
               </p>
             </div>

@@ -62,12 +62,12 @@ export default async function CategoryPage({ params }: PageProps) {
   const categoryName = menuItem.label;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
       {/* Header */}
-      <div className="mb-20 text-center">
-        <h1 className="text-5xl md:text-6xl font-playfair font-bold text-brand mb-6 tracking-tight">{categoryName}</h1>
-        <div className="w-24 h-1 bg-[#C5A059] mx-auto rounded-full mb-8"></div>
-        <p className="mt-6 text-brand/70 max-w-2xl mx-auto font-inter leading-relaxed">
+      <div className="mb-10 text-center">
+        <h1 className="text-5xl md:text-6xl font-playfair font-bold text-brand mb-4 tracking-tight">{categoryName}</h1>
+        <div className="w-24 h-1 bg-[#C5A059] mx-auto rounded-full mb-4"></div>
+        <p className="text-brand/70 max-w-2xl mx-auto font-inter leading-relaxed">
           Explore our curated selection of premium {categoryName.toLowerCase()} pieces, 
           each designed with meticulous attention to detail and crafted for an impeccable fit.
         </p>

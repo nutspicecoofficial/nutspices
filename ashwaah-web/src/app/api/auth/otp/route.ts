@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, otpVerifications } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
@@ -20,19 +20,55 @@ export async function POST(request: Request) {
 
     // Action 1: Send OTP
     if (action === "send") {
-      console.log(`[Auth Request ${requestId}] Sending OTP to ${phone}`);
-      // Success is mocked for development
-      return NextResponse.json({ success: true, message: "OTP sent successfully" });
+      console.log(`[Auth Request ${requestId}] MOCK Sending OTP to ${phone}`);
+      
+      // Always use 123456 for everyone during development
+      const generatedOtp = "123456";
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Clear existing OTPs for this number
+      await db.delete(otpVerifications).where(eq(otpVerifications.phoneNumber, phone));
+
+      // Insert new OTP
+      await db.insert(otpVerifications).values({
+        phoneNumber: phone,
+        otp: generatedOtp,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      console.log(`[DEVELOPMENT MOCK] OTP for ${phone} is ${generatedOtp}`);
+
+      return NextResponse.json({ success: true, message: "OTP sent successfully (Dev Mode: 123456)" });
     }
 
     // Action 2: Verify OTP
     if (action === "verify") {
       console.log(`[Auth Request ${requestId}] Verifying OTP for ${phone}`);
       
-      // Static OTP logic for development/testing
-      if (otp !== "123456") {
-        return NextResponse.json({ success: false, error: "Invalid verification code. Please enter 123456 for testing." }, { status: 400 });
+      // Allow 123456 for any number, or check DB
+      const isDevOtp = otp === "123456";
+      
+      let validRecord = false;
+      if (isDevOtp) {
+        validRecord = true;
+      } else {
+        const otpRecords = await db.select()
+          .from(otpVerifications)
+          .where(
+            and(
+              eq(otpVerifications.phoneNumber, phone),
+              eq(otpVerifications.otp, otp)
+            )
+          );
+        validRecord = otpRecords.some(record => new Date(record.expiresAt) > new Date());
       }
+
+      if (!validRecord) {
+        return NextResponse.json({ success: false, error: "Invalid or expired OTP. Please try again." }, { status: 400 });
+      }
+
+      // Delete the OTP as it's been used
+      await db.delete(otpVerifications).where(eq(otpVerifications.phoneNumber, phone));
 
       let user = null;
       let isNewUser = false;
@@ -53,14 +89,18 @@ export async function POST(request: Request) {
           await db.insert(users).values({
             phoneNumber: phone,
             role: phone === adminPhone ? "admin" : "user",
+            lastLoginAt: new Date().toISOString(),
           });
           isNewUser = true;
           console.log(`[Auth Request ${requestId}] New user created`);
         } else {
-          // If existing user is the designated admin, ensure their role is updated
-          if (phone === adminPhone && user.role !== "admin") {
-            await db.update(users).set({ role: "admin" }).where(eq(users.phoneNumber, phone));
-          }
+          // Update lastLoginAt
+          await db.update(users)
+            .set({ 
+              lastLoginAt: new Date().toISOString(),
+              ...(phone === adminPhone && user.role !== "admin" ? { role: "admin" } : {})
+            })
+            .where(eq(users.phoneNumber, phone));
           
           if (!user.fullName) {
             console.log(`[Auth Request ${requestId}] User exists but profile incomplete`);

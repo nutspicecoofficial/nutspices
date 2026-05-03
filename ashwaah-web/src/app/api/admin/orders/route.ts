@@ -21,6 +21,7 @@ export async function GET() {
       totalAmount: orders.totalAmount,
       status: orders.status,
       createdAt: orders.createdAt,
+      shippingAddress: orders.shippingAddress,
       customerName: users.fullName,
       customerPhone: users.phoneNumber,
     })

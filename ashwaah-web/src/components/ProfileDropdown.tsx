@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { User, Package, Settings, LogOut, ChevronDown } from "lucide-react";
+import { User, Package, Settings, LogOut, ChevronDown, MapPin } from "lucide-react";
 
 interface ProfileDropdownProps {
   user: {
@@ -32,21 +32,17 @@ export default function ProfileDropdown({ user, onLogout }: ProfileDropdownProps
     setIsOpen(false);
   }, [user]);
 
-  const initials = user.fullName ? user.fullName.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2) : "U";
+  const initials = user.fullName ? user.fullName.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 1) : "U";
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 bg-white/5 px-4 py-2 rounded-full hover:bg-white/10 transition-all border border-white/5 group"
+        className="flex items-center justify-center bg-white/5 w-10 h-10 rounded-full hover:bg-white/10 transition-all border border-white/5 group"
       >
         <div className="w-7 h-7 rounded-full bg-[#C5A059] flex items-center justify-center text-[10px] text-white font-bold shadow-sm">
           {initials}
         </div>
-        <span className="text-xs font-bold tracking-widest uppercase text-white max-w-[100px] truncate">
-          {user.fullName || "Profile"}
-        </span>
-        <ChevronDown size={14} className={`text-white/40 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Menu */}
@@ -68,9 +64,20 @@ export default function ProfileDropdown({ user, onLogout }: ProfileDropdownProps
               </div>
               <span className="text-sm font-bold tracking-tight">Edit Profile</span>
             </Link>
+
+            <Link 
+              href="/account/address" 
+              className="flex items-center space-x-3 px-4 py-3 rounded-xl text-brand/70 hover:bg-brand/5 hover:text-brand transition-all group"
+              onClick={() => setIsOpen(false)}
+            >
+              <div className="p-2 rounded-lg bg-brand/5 group-hover:bg-white transition-colors">
+                <MapPin size={16} />
+              </div>
+              <span className="text-sm font-bold tracking-tight">My Address</span>
+            </Link>
             
             <Link 
-              href="/account/orders" 
+              href="/profile/orders" 
               className="flex items-center space-x-3 px-4 py-3 rounded-xl text-brand/70 hover:bg-brand/5 hover:text-brand transition-all group"
               onClick={() => setIsOpen(false)}
             >

@@ -374,7 +374,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                   {selectedColor && selectedSize && currentStock === 0 ? "Out of Stock" : added ? "Added to Bag!" : "Add to Bag"}
                 </span>
               </button>
-              <p className="text-center text-[10px] text-brand/30 mt-4 font-medium uppercase tracking-[0.2em]">Free express shipping on orders over ₹10,000</p>
+
             </div>
           </div>
         </div>

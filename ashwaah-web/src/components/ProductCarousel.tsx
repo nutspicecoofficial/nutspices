@@ -31,8 +31,8 @@ export default function ProductCarousel({ title, products }: ProductCarouselProp
   if (products.length === 0) return null;
 
   return (
-    <section className="py-4">
-      <div className="flex items-center justify-between mb-8">
+    <section className="py-2">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-playfair font-bold text-brand tracking-tight">{title}</h2>
         <div className="flex space-x-2">
           <button 
@@ -54,7 +54,7 @@ export default function ProductCarousel({ title, products }: ProductCarouselProp
 
       <div 
         ref={scrollRef}
-        className="flex space-x-8 overflow-x-auto scrollbar-hide pb-8 snap-x snap-mandatory"
+        className="flex space-x-4 md:space-x-6 overflow-x-auto scrollbar-hide pb-8 snap-x snap-mandatory"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {products.map((product: any) => {
@@ -71,7 +71,7 @@ export default function ProductCarousel({ title, products }: ProductCarouselProp
           } catch (e) {}
 
           return (
-            <div key={product.id} className="w-[280px] sm:w-[320px] flex-shrink-0 snap-start h-auto flex">
+            <div key={product.id} className="w-[220px] md:w-[240px] flex-shrink-0 snap-start h-auto flex">
               <ProductCard 
                 product={{
                   id: product.id.toString(),

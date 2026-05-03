@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, ChevronRight, XCircle, AlertTriangle } from "lucide-react";
+import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, ChevronRight, XCircle, AlertTriangle, Image as ImageIcon, MapPin } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 interface OrderItem {
   id: number;
   productName: string;
+  productImage: string;
   quantity: number;
   price: number;
   size: string;
@@ -22,6 +23,7 @@ interface Order {
   id: number;
   totalAmount: number;
   status: string;
+  shippingAddress: string | null;
   createdAt: string;
   items: OrderItem[];
 }
@@ -110,27 +112,27 @@ export default function MyOrdersPage() {
           <Link href="/" className="inline-block bg-brand text-white px-8 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-brand-hover shadow-lg">Start Shopping</Link>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-6">
           {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-[2.5rem] border border-brand/5 shadow-xl overflow-hidden hover:shadow-2xl transition-all group">
-              <div className="p-6 md:p-8 bg-[#1B3022] flex flex-col md:flex-row md:items-center justify-between border-b border-brand/5 gap-6 text-white">
-                <div className="flex items-center space-x-6">
-                  <div className="p-4 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl text-white group-hover:scale-110 transition-transform">
-                    <Package size={24} />
+            <div key={order.id} className="bg-white rounded-[2rem] border border-brand/5 shadow-lg overflow-hidden hover:shadow-xl transition-all group">
+              <div className="p-4 md:p-6 bg-[#1B3022] flex flex-col md:flex-row md:items-center justify-between border-b border-brand/5 gap-4 text-white">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-white/10 backdrop-blur-md border border-white/10 rounded-xl text-white group-hover:scale-110 transition-transform">
+                    <Package size={20} />
                   </div>
                   <div>
-                    <div className="flex items-center space-x-3 mb-1">
-                      <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Order ID</p>
-                      <span className="text-xs font-bold text-white/40 uppercase tracking-widest px-2.5 py-1 bg-white/5 rounded-full border border-white/5">#AS-{order.id}</span>
+                    <div className="flex items-center space-x-3 mb-0.5">
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Order ID</p>
+                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest px-2 py-0.5 bg-white/5 rounded-full border border-white/5">#AS-{order.id}</span>
                     </div>
-                    <h4 className="text-xl font-bold text-white">Ashwaah Custom Fit</h4>
+                    <h4 className="text-lg font-bold text-white leading-tight">Ashwaah Custom Fit</h4>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6 md:gap-12">
-                  <div className="min-w-[120px]">
-                    <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Status</p>
-                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm border ${
+                <div className="flex flex-wrap items-center gap-4 md:gap-8">
+                  <div className="min-w-[100px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Status</p>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm border ${
                       order.status === 'delivered' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
                       order.status === 'cancelled' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
                       'bg-[#C5A059]/20 text-[#C5A059] border-[#C5A059]/30'
@@ -138,20 +140,20 @@ export default function MyOrdersPage() {
                       {order.status}
                     </span>
                   </div>
-                  <div className="min-w-[100px]">
-                    <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Placed On</p>
-                    <span className="text-xs font-bold text-white">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  <div className="min-w-[80px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Date</p>
+                    <span className="text-[10px] font-bold text-white">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </div>
-                  <div className="text-right min-w-[100px]">
-                    <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Total</p>
-                    <span className="text-xl font-black text-white tracking-tighter">₹{order.totalAmount.toLocaleString()}</span>
+                  <div className="text-right min-w-[80px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Total</p>
+                    <span className="text-lg font-black text-white tracking-tighter">₹{order.totalAmount.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               {/* Delivery Milestones Tracker */}
               {order.status !== "cancelled" && (
-                <div className="px-12 md:px-32 lg:px-48 pb-12 pt-4">
+                <div className="px-10 md:px-24 lg:px-32 pb-8 pt-4">
                   <div className="relative">
                     {/* Background Line */}
                     <div className="absolute top-1/2 left-0 w-full h-[1px] bg-brand/10 -translate-y-1/2 rounded-full" />
@@ -191,13 +193,33 @@ export default function MyOrdersPage() {
 
               <div className="p-6 md:px-8 md:py-6 space-y-6">
                 {order.items.map((item, idx) => (
-                  <div key={item.id} className="flex flex-col md:flex-row gap-6 items-start pb-6 border-b border-brand/5 last:border-0 last:pb-0">
-                    <div className="flex-1">
+                  <div key={item.id} className="flex flex-row gap-6 items-start pb-6 border-b border-brand/5 last:border-0 last:pb-0">
+                    <div className="w-24 h-32 bg-brand/5 rounded-2xl overflow-hidden flex-shrink-0 border border-brand/5 shadow-sm relative group/img">
+                      {item.productImage ? (
+                        <img 
+                          src={item.productImage} 
+                          alt={item.productName} 
+                          className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = ""; // Clear src to show fallback
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-brand/20">
+                          <ImageIcon size={24} />
+                        </div>
+                      )}
+                      {/* Fallback for broken images */}
+                      <div className="absolute inset-0 flex items-center justify-center text-brand/10 -z-10 bg-brand/5">
+                        <ImageIcon size={24} />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-1">
                         <h5 className="text-base font-bold text-brand">{item.productName}</h5>
                         
                         {/* Compact Cancel Button Moved Here */}
-                        {idx === 0 && ["pending", "processing", "confirmed"].includes(order.status) && (
+                        {idx === 0 && ["pending"].includes(order.status) && (
                           <button 
                             onClick={() => handleCancelOrder(order.id)}
                             className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-all group/cancel"
@@ -215,7 +237,7 @@ export default function MyOrdersPage() {
                       </div>
                       
                       {item.customizations && item.customizations.measurements && Object.keys(item.customizations.measurements).length > 0 && (
-                        <div className="bg-brand/5 rounded-2xl p-4 border border-brand/5">
+                        <div className="bg-brand/5 rounded-2xl p-4 border border-brand/5 mb-4">
                           <div className="flex items-center space-x-2 mb-3">
                             <Ruler size={12} className="text-[#C5A059]" />
                             <span className="text-[9px] font-black text-brand uppercase tracking-widest">Your Custom Fit (Inches)</span>
@@ -230,12 +252,29 @@ export default function MyOrdersPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Shipping Address Moved Here */}
+                      {idx === 0 && (
+                        <div className="mt-4">
+                          <div className="flex items-start space-x-3 px-4 py-3 rounded-2xl bg-brand/5 border border-brand/5 w-full md:w-3/4">
+                            <MapPin size={14} className="text-[#C5A059] mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest mb-1 text-brand/40">Delivery Address</p>
+                              <p className="text-[11px] font-bold text-brand leading-relaxed">
+                                {order.shippingAddress || "No address provided"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                      <div className="text-right self-center">
+                      <div className="text-right self-center min-w-[80px]">
                         <span className="text-sm font-black text-brand">₹{item.price.toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
+
+
 
                   {/* Status Messages */}
                   {order.status === "cancelled" && (

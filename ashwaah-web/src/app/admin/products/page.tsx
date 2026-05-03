@@ -51,6 +51,8 @@ export default function ProductManagement() {
   const [isCustomizable, setIsCustomizable] = useState(false);
   const [tags, setTags] = useState("");
   const [enabledMeasurements, setEnabledMeasurements] = useState<string[]>([]);
+  const [customMeasurements, setCustomMeasurements] = useState<string[]>([]);
+  const [newMeasurementInput, setNewMeasurementInput] = useState("");
   const [pendingColor, setPendingColor] = useState("#C5A059");
 
   // Images
@@ -129,6 +131,8 @@ export default function ProductManagement() {
     setIsFeatured(false); setIsCustomizable(false); setTags(""); setImages([]);
     setSelectedSizes([]); setSelectedColors([]); setVariations([]);
     setEnabledMeasurements([]);
+    setCustomMeasurements([]);
+    setNewMeasurementInput("");
   };
 
   const handleEdit = async (id: number) => {
@@ -162,12 +166,20 @@ export default function ProductManagement() {
 
         if (p.enabledMeasurements) {
           try {
-            setEnabledMeasurements(JSON.parse(p.enabledMeasurements));
+            const enabled = JSON.parse(p.enabledMeasurements);
+            setEnabledMeasurements(enabled);
+            
+            // Extract custom ones
+            const presets = p.gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS;
+            const custom = enabled.filter((m: string) => !presets.includes(m));
+            setCustomMeasurements(custom);
           } catch {
             setEnabledMeasurements([]);
+            setCustomMeasurements([]);
           }
         } else {
           setEnabledMeasurements([]);
+          setCustomMeasurements([]);
         }
         
         // Scroll to form
@@ -240,8 +252,8 @@ export default function ProductManagement() {
       <div className="flex h-full w-full overflow-hidden">
         
         {/* ─── LEFT: FORM (Middle Workspace) ────────────────────────── */}
-        <div className="flex-[3] h-full overflow-y-auto custom-scrollbar p-6 md:p-10 border-r border-brand/5">
-          <div className="flex items-center justify-between mb-8">
+        <div className="flex-[3] h-full overflow-y-auto custom-scrollbar p-4 md:p-6 border-r border-brand/5">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-[#C5A059]/10 rounded-xl">
                 {editingId ? <Edit3 className="text-[#C5A059]" size={22} /> : <Plus className="text-[#C5A059]" size={22} />}
@@ -260,7 +272,7 @@ export default function ProductManagement() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-sm border border-brand/5 space-y-10">
+          <form onSubmit={handleSubmit} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-brand/5 space-y-8">
 
             {/* ── Section 1: Identity ── */}
             <div>
@@ -349,26 +361,65 @@ export default function ProductManagement() {
                         <p className="text-[10px] font-bold uppercase tracking-widest">Please select Men or Women gender to configure measurements</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {(gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS).map(m => (
-                          <button
-                            key={m}
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {Array.from(new Set([
+                            ...(gender === "men" ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS),
+                            ...customMeasurements
+                          ])).map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => toggleMeasurement(m)}
+                              className={`flex items-center space-x-3 p-4 rounded-2xl border transition-all ${
+                                enabledMeasurements.includes(m)
+                                  ? "bg-brand text-white border-brand shadow-lg"
+                                  : "bg-white text-brand/60 border-brand/5 hover:border-brand/20"
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                                enabledMeasurements.includes(m) ? "bg-white border-white text-brand" : "bg-brand/5 border-brand/10"
+                              }`}>
+                                {enabledMeasurements.includes(m) && <Check size={12} strokeWidth={4} />}
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-widest truncate">{m}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Add Custom Measurement Button/Input */}
+                        <div className="flex items-center gap-3 p-4 bg-white/50 rounded-2xl border border-brand/10 border-dashed">
+                          <input 
+                            type="text"
+                            value={newMeasurementInput}
+                            onChange={(e) => setNewMeasurementInput(e.target.value)}
+                            placeholder="Add custom measurement (e.g. Belt Size)..."
+                            className="flex-1 bg-transparent border-none text-[10px] font-bold uppercase tracking-widest outline-none placeholder:text-brand/20"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (newMeasurementInput.trim()) {
+                                  setCustomMeasurements(prev => [...prev, newMeasurementInput.trim()]);
+                                  setEnabledMeasurements(prev => [...prev, newMeasurementInput.trim()]);
+                                  setNewMeasurementInput("");
+                                }
+                              }
+                            }}
+                          />
+                          <button 
                             type="button"
-                            onClick={() => toggleMeasurement(m)}
-                            className={`flex items-center space-x-3 p-4 rounded-2xl border transition-all ${
-                              enabledMeasurements.includes(m)
-                                ? "bg-brand text-white border-brand shadow-lg"
-                                : "bg-white text-brand/60 border-brand/5 hover:border-brand/20"
-                            }`}
+                            onClick={() => {
+                              if (newMeasurementInput.trim()) {
+                                setCustomMeasurements(prev => [...prev, newMeasurementInput.trim()]);
+                                setEnabledMeasurements(prev => [...prev, newMeasurementInput.trim()]);
+                                setNewMeasurementInput("");
+                              }
+                            }}
+                            className="p-2 bg-brand text-white rounded-lg hover:scale-110 transition-transform shadow-md"
                           >
-                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                              enabledMeasurements.includes(m) ? "bg-white border-white text-brand" : "bg-brand/5 border-brand/10"
-                            }`}>
-                              {enabledMeasurements.includes(m) && <Check size={12} strokeWidth={4} />}
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest truncate">{m}</span>
+                            <Plus size={14} />
                           </button>
-                        ))}
+                        </div>
                       </div>
                     )}
                     

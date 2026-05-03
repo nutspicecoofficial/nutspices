@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, ShoppingCart, User, Menu, X, LogOut, AlertCircle } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X, LogOut, AlertCircle, BookOpen } from "lucide-react";
 import ProfileDropdown from "./ProfileDropdown";
+import SearchModal from "./SearchModal";
 import { useCartStore } from "@/store/useCartStore";
 
 type NavItem = {
@@ -27,6 +28,8 @@ export default function Navbar() {
   const [user, setUser] = useState<{ fullName: string | null; phoneNumber: string } | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Cart store hydration handling
   const [cartCount, setCartCount] = useState(0);
@@ -89,6 +92,14 @@ export default function Navbar() {
     fetchData();
   }, [pathname]);
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
+
   const confirmLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -119,17 +130,17 @@ export default function Navbar() {
           <div className="flex justify-between items-center h-16">
             
             {/* Logo */}
-            <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="font-playfair text-2xl font-bold text-white tracking-tighter hover:text-[#C5A059] transition-colors">
+            <div className="flex-shrink-0 flex items-center mr-8">
+              <Link href="/" className="font-playfair text-xl md:text-2xl font-bold text-white tracking-tighter hover:text-[#C5A059] transition-colors">
                 Ashwaah
               </Link>
             </div>
 
             {/* Desktop Navigation (Dynamic from DB) */}
-            <nav className="hidden md:flex space-x-10">
+            <nav className="hidden lg:flex items-center space-x-6 mr-4">
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-5 w-20 bg-white/10 rounded-full animate-pulse"></div>
+                  <div key={i} className="h-4 w-16 bg-white/10 rounded-full animate-pulse"></div>
                 ))
               ) : (
                 navItems.map((item) => {
@@ -138,7 +149,7 @@ export default function Navbar() {
                     <Link
                       key={item.id}
                       href={item.href}
-                      className={`text-xs font-bold uppercase tracking-widest transition-all duration-300 relative group py-1 ${
+                      className={`text-[12px] font-bold uppercase tracking-[0.15em] transition-all duration-300 relative group py-1 whitespace-nowrap ${
                         isActive ? "text-[#C5A059]" : "text-white hover:text-[#C5A059]"
                       }`}
                     >
@@ -152,11 +163,39 @@ export default function Navbar() {
               )}
             </nav>
 
-            {/* User Actions */}
-            <div className="hidden md:flex items-center space-x-8 text-white">
-              <button aria-label="Search" className="hover:text-[#C5A059] transition-colors p-2">
-                <Search className="h-4 w-4" />
-              </button>
+            <div className="hidden md:flex items-center space-x-4 ml-auto text-white">
+              {/* Amazon Style Search Bar */}
+              <div className="max-w-[200px]">
+                <form onSubmit={handleSearchSubmit} className="w-full flex">
+                  <div className="relative flex-1">
+                    <input 
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search Ashwaah..."
+                      className="w-full bg-white text-brand-dark px-3 py-2 rounded-l-md text-xs focus:outline-none placeholder:text-brand-dark/40"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="bg-[#C5A059] hover:bg-[#B38E46] text-white px-3 rounded-r-md transition-colors flex items-center justify-center"
+                  >
+                    <Search size={16} strokeWidth={2.5} />
+                  </button>
+                </form>
+              </div>
+
+              <Link href="/my-story" aria-label="My Story" className="hover:text-[#C5A059] transition-colors p-2 flex items-center gap-1.5 group">
+                <BookOpen className="h-5 w-5" />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">My Story</span>
+              </Link>
+
+              <Link href={user ? "/cart" : "/login"} aria-label="Cart" className="hover:text-[#C5A059] transition-colors relative p-2">
+                <ShoppingCart className="h-5 w-5" />
+                <span className="absolute top-0 right-0 bg-[#C5A059] text-white text-[8px] font-black h-3.5 w-3.5 rounded-full flex items-center justify-center border-2 border-[#1B3022]">
+                  {cartCount}
+                </span>
+              </Link>
               
               {user ? (
                 <ProfileDropdown 
@@ -164,26 +203,25 @@ export default function Navbar() {
                   onLogout={() => setIsLogoutModalOpen(true)} 
                 />
               ) : (
-                <Link href="/login" className="flex items-center space-x-2 text-xs font-bold tracking-[0.2em] uppercase bg-[#C5A059] text-white px-6 py-2.5 rounded-full hover:bg-[#B38E46] transition-all shadow-md cursor-pointer">
+                <button 
+                  onClick={() => window.location.href = "/login"}
+                  className="flex items-center space-x-2 text-xs font-bold tracking-[0.2em] uppercase bg-[#C5A059] text-white px-6 py-2.5 rounded-full hover:bg-[#B38E46] transition-all shadow-md cursor-pointer relative z-10"
+                >
                   <User className="h-4 w-4" />
                   <span>Login</span>
-                </Link>
+                </button>
               )}
-
-              <Link href="/cart" aria-label="Cart" className="hover:text-[#C5A059] transition-colors relative p-2">
-                <ShoppingCart className="h-4 w-4" />
-                <span className="absolute top-0 right-0 bg-[#C5A059] text-white text-[8px] font-black h-3.5 w-3.5 rounded-full flex items-center justify-center border-2 border-[#1B3022]">
-                  {cartCount}
-                </span>
-              </Link>
             </div>
 
             {/* Mobile menu button */}
             <div className="flex md:hidden items-center space-x-4">
-              <button aria-label="Search" className="text-white p-2">
+              <button onClick={() => setIsSearchOpen(true)} aria-label="Search" className="text-white p-2">
                 <Search className="h-5 w-5" />
               </button>
-              <Link href="/cart" aria-label="Cart" className="text-white relative p-2">
+              <Link href="/my-story" aria-label="My Story" className="text-white p-2">
+                <BookOpen className="h-5 w-5" />
+              </Link>
+              <Link href={user ? "/cart" : "/login"} aria-label="Cart" className="text-white relative p-2">
                 <ShoppingCart className="h-5 w-5" />
                 <span className="absolute top-0 right-0 bg-[#C5A059] text-white text-[9px] font-black h-4 w-4 rounded-full flex items-center justify-center border-2 border-[#1B3022]">
                   {cartCount}
@@ -259,13 +297,15 @@ export default function Navbar() {
                     </button>
                   </div>
                 ) : (
-                  <Link
-                    href="/login"
-                    className="block w-full px-4 py-5 rounded-xl text-center text-sm font-bold uppercase tracking-[0.2em] text-white bg-[#C5A059] hover:bg-[#B38E46] shadow-lg"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      window.location.href = "/login";
+                    }}
+                    className="block w-full px-4 py-5 rounded-xl text-center text-sm font-bold uppercase tracking-[0.2em] text-white bg-[#C5A059] hover:bg-[#B38E46] shadow-lg relative z-10"
                   >
                     Login / Sign Up
-                  </Link>
+                  </button>
                 )}
               </div>
             </div>
@@ -310,6 +350,8 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );
 }

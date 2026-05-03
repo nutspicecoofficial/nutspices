@@ -25,7 +25,12 @@ export async function GET(request: Request) {
       if (!product.length) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
       
       const variations = await db.select().from(productVariations).where(eq(productVariations.productId, parseInt(id)));
-      return NextResponse.json({ success: true, data: { ...product[0], variations } });
+      // Map mrp to basePrice for the frontend
+      const mappedVariations = variations.map(v => ({
+        ...v,
+        basePrice: v.mrp
+      }));
+      return NextResponse.json({ success: true, data: { ...product[0], variations: mappedVariations } });
     }
     
     // Fetch products with their total stock
@@ -112,7 +117,7 @@ export async function POST(request: Request) {
           size: v.size,
           color: v.color || "Default",
           stock: parseInt(v.stock) || 0,
-          basePrice: Number(v.basePrice) || 0,
+          mrp: Number(v.basePrice) || 0,
           salePrice: Number(v.salePrice) || 0,
           sku: v.sku || `${insertedProduct.id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
         }));
@@ -179,7 +184,7 @@ export async function PATCH(request: Request) {
             size: v.size,
             color: v.color || "Default",
             stock: parseInt(v.stock) || 0,
-            basePrice: Number(v.basePrice) || 0,
+            mrp: Number(v.basePrice) || 0,
             salePrice: Number(v.salePrice) || 0,
             sku: v.sku || `${id}-${v.size}${v.color && v.color !== "Default" ? `-${v.color}` : ""}`
           }));

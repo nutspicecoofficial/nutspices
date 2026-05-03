@@ -11,14 +11,18 @@ import {
   Users, 
   LogOut,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Box,
+  BarChart3
 } from "lucide-react";
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { name: "Inventory", href: "/admin/inventory", icon: Box },
+  { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Navbar Settings", href: "/admin/navigation", icon: Map },
   { name: "Products", href: "/admin/products", icon: Shirt },
-  { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Customers", href: "/admin/customers", icon: Users },
 ];
 

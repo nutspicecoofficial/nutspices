@@ -45,7 +45,6 @@ export default function ProductSelectorModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetchProducts();
       setSelectedIds(initialSelectedIds);
       setIsAdding(false);
     }
@@ -65,6 +64,17 @@ export default function ProductSelectorModal({
       setLoading(false);
     }
   };
+
+  // Live Search
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        fetchProducts(search);
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [search, isOpen]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +158,7 @@ export default function ProductSelectorModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-dark/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-[2rem] w-[95%] max-w-6xl h-[85vh] max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-8 border-b border-brand/5 flex items-center justify-between bg-brand text-white">
           <div className="flex items-center space-x-4">
@@ -165,15 +175,6 @@ export default function ProductSelectorModal({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {!isAdding && (
-              <button 
-                onClick={() => setIsAdding(true)}
-                className="bg-[#C5A059] hover:bg-[#D4B16A] text-brand px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center space-x-2"
-              >
-                <Plus size={16} />
-                <span>Add New Product</span>
-              </button>
-            )}
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <X size={24} />
             </button>
@@ -312,7 +313,7 @@ export default function ProductSelectorModal({
           /* Selection View */
           <>
             {/* Search Bar */}
-            <div className="p-6 bg-brand/5 border-b border-brand/5">
+            <div className="p-4 bg-brand/5 border-b border-brand/5">
               <form onSubmit={handleSearch} className="relative max-w-md">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30" size={18} />
                 <input 
@@ -326,14 +327,14 @@ export default function ProductSelectorModal({
             </div>
 
             {/* Product List */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-brand/20">
                   <Loader2 className="w-10 h-10 animate-spin mb-4" />
                   <p className="text-xs font-black uppercase tracking-widest">Searching Inventory...</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {products.map((product) => {
                     const isSelected = selectedIds.includes(product.id);
                     const images = JSON.parse(product.images || "[]");
@@ -341,13 +342,13 @@ export default function ProductSelectorModal({
                       <div 
                         key={product.id}
                         onClick={() => toggleProduct(product.id)}
-                        className={`flex items-center space-x-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-center space-x-5 p-2.5 rounded-2xl border-2 cursor-pointer transition-all ${
                           isSelected 
                             ? "border-[#C5A059] bg-[#C5A059]/5 shadow-md" 
                             : "border-brand/5 hover:border-brand/10"
                         }`}
                       >
-                        <div className="w-16 h-16 bg-brand/5 rounded-xl overflow-hidden flex-shrink-0 border border-brand/5">
+                        <div className="w-24 h-24 bg-brand/5 rounded-xl overflow-hidden flex-shrink-0 border border-brand/5">
                           <img 
                             src={images[0] || "/images/placeholder.png"} 
                             alt={product.name} 
@@ -381,7 +382,7 @@ export default function ProductSelectorModal({
         )}
 
         {/* Footer */}
-        <div className="p-8 border-t border-brand/5 bg-brand/5 flex items-center justify-between">
+        <div className="p-6 border-t border-brand/5 bg-brand/5 flex items-center justify-between">
           {isAdding ? (
             <>
               <button 
