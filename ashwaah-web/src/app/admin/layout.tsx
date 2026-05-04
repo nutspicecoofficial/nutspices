@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -13,7 +13,9 @@ import {
   ChevronRight,
   Sparkles,
   Box,
-  BarChart3
+  BarChart3,
+  AlertTriangle,
+  X
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -28,11 +30,17 @@ const sidebarLinks = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Don't show sidebar on login/denied pages
   if (pathname === "/admin/login" || pathname === "/admin/denied") {
     return <>{children}</>;
   }
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/admin/login";
+  };
 
   return (
     <div className="flex h-screen bg-brand-light font-inter overflow-hidden">
@@ -77,10 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="p-6 border-t border-white/5">
           <button 
-            onClick={async () => {
-              await fetch("/api/auth/logout", { method: "POST" });
-              window.location.href = "/admin/login";
-            }}
+            onClick={() => setShowLogoutConfirm(true)}
             className="w-full flex items-center space-x-4 px-4 py-4 rounded-2xl text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all group"
           >
             <LogOut size={18} />
@@ -98,6 +103,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </div>
       </main>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-[#1B3022]/80 backdrop-blur-sm animate-in fade-in duration-300"
+            onClick={() => setShowLogoutConfirm(false)}
+          />
+          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-[#1B3022] mb-2">Confirm Logout</h3>
+              <p className="text-[#1B3022]/60 text-sm mb-8">Are you sure you want to exit the admin panel? You will need to login again to access these settings.</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-[#1B3022]/40 hover:text-[#1B3022] hover:bg-brand-light transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleLogout}
+                  className="px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute top-4 right-4 p-2 text-[#1B3022]/20 hover:text-[#1B3022] transition-all"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

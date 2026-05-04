@@ -36,12 +36,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [mainImage, setMainImage] = useState<string>("");
-  const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
   const [measurements, setMeasurements] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const [toast, setToast] = useState("");
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
-  
+
   const addItem = useCartStore((state) => state.addItem);
 
   useEffect(() => {
@@ -51,18 +51,18 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         if (res.ok) {
           const data = await res.json();
           setProduct(data);
-          
+
           // Set initial color and size if available
           const uniqueColors = Array.from(new Set(data.variations.map((v: Variation) => v.color)));
           if (uniqueColors.length > 0) {
             const firstColor = uniqueColors[0] as string;
             setSelectedColor(firstColor);
-            
+
             // Also set first size for that color
             const firstSize = data.variations.find((v: Variation) => v.color === firstColor)?.size;
             if (firstSize) setSelectedSize(firstSize);
           }
-          
+
           // Set initial main image
           const images = JSON.parse(data.images || "[]");
           if (images.length > 0) {
@@ -99,10 +99,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
   const images = JSON.parse(product.images || "[]");
   const variations = product.variations || [];
-  
+
   // Get unique colors available for this product
   const availableColors = Array.from(new Set(variations.map(v => v.color))).filter(Boolean);
-  
+
   // Get sizes available for the selected color
   const sizesForColor = variations.filter(v => v.color === selectedColor);
   const availableSizes = Array.from(new Set(sizesForColor.map(v => v.size)));
@@ -115,7 +115,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const displayPrice = currentVariation?.salePrice || product.salePrice || product.basePrice;
   const mrp = currentVariation?.mrp || product.basePrice;
   const currentStock = currentVariation?.stock || 0;
-  
+
   const enabledMeasurementsList = JSON.parse(product.enabledMeasurements || "[]") as string[];
 
   const handleAddToCart = () => {
@@ -133,8 +133,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     }
 
     // Create a unique ID/hash for this item including customizations
-    const customHash = Object.keys(measurements).length > 0 
-      ? `_custom_${btoa(JSON.stringify(measurements)).slice(0, 10)}` 
+    const customHash = Object.keys(measurements).length > 0
+      ? `_custom_${btoa(JSON.stringify(measurements)).slice(0, 10)}`
       : "";
 
     addItem({
@@ -146,9 +146,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
       quantity: 1,
       size: selectedSize,
       color: selectedColor,
-      customizations: { 
+      customizations: {
         type: Object.keys(measurements).length > 0 ? "Bespoke" : "Standard",
-        measurements: measurements 
+        measurements: measurements
       },
     });
 
@@ -179,9 +179,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 <button
                   key={idx}
                   onClick={() => setMainImage(img)}
-                  className={`relative flex-shrink-0 w-20 h-24 md:w-24 md:h-32 rounded-lg overflow-hidden border-2 transition-all ${
-                    mainImage === img ? "border-brand-accent shadow-md scale-105" : "border-transparent hover:border-brand/20"
-                  }`}
+                  className={`relative flex-shrink-0 w-20 h-24 md:w-24 md:h-32 rounded-lg overflow-hidden border-2 transition-all ${mainImage === img ? "border-brand-accent shadow-md scale-105" : "border-transparent hover:border-brand/20"
+                    }`}
                 >
                   <img src={img} alt={`${product.name} ${idx}`} className="w-full h-full object-cover" />
                 </button>
@@ -190,9 +189,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
             {/* Main Image */}
             <div className="flex-1 aspect-[4/5] relative rounded-2xl overflow-hidden bg-white shadow-xl group">
-              <img 
-                src={mainImage} 
-                alt={product.name} 
+              <img
+                src={mainImage}
+                alt={product.name}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
               <div className="absolute top-6 right-6">
@@ -244,15 +243,14 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                       setSelectedColor(color);
                       setSelectedSize(null); // Reset size when color changes
                     }}
-                    className={`relative w-12 h-12 rounded-full border-2 p-1 transition-all ${
-                      selectedColor === color 
-                        ? "border-brand-accent scale-110 shadow-lg" 
+                    className={`relative w-12 h-12 rounded-full border-2 p-1 transition-all ${selectedColor === color
+                        ? "border-brand-accent scale-110 shadow-lg"
                         : "border-transparent hover:border-brand/20"
-                    }`}
+                      }`}
                     title={color}
                   >
-                    <div 
-                      className="w-full h-full rounded-full border border-black/5" 
+                    <div
+                      className="w-full h-full rounded-full border border-black/5"
                       style={{ backgroundColor: color.toLowerCase() }}
                     >
                       {selectedColor === color && (
@@ -272,7 +270,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 <span className="text-sm font-bold text-brand uppercase tracking-widest flex items-center gap-2">
                   2. Select Size <span className="text-brand/30">—</span> <span className="text-brand-accent">{selectedSize || "None"}</span>
                 </span>
-                <button 
+                <button
                   onClick={() => setIsSizeGuideOpen(true)}
                   className="text-[10px] text-brand/40 hover:text-brand-accent font-bold uppercase tracking-widest transition-colors underline underline-offset-4"
                 >
@@ -283,19 +281,18 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 {availableSizes.map((size) => {
                   const variation = variations.find(v => v.color === selectedColor && v.size === size);
                   const isOutOfStock = variation ? variation.stock === 0 : true;
-                  
+
                   return (
                     <button
                       key={size}
                       disabled={isOutOfStock}
                       onClick={() => setSelectedSize(size)}
-                      className={`min-w-[48px] h-12 rounded-xl flex items-center justify-center text-xs font-bold transition-all border-2 ${
-                        selectedSize === size 
-                          ? "bg-brand text-white border-brand scale-105 shadow-md" 
+                      className={`min-w-[48px] h-12 rounded-xl flex items-center justify-center text-xs font-bold transition-all border-2 ${selectedSize === size
+                          ? "bg-brand text-white border-brand scale-105 shadow-md"
                           : isOutOfStock
-                          ? "bg-brand/5 text-brand/20 border-transparent cursor-not-allowed line-through opacity-50"
-                          : "bg-white text-brand/70 border-brand/5 hover:border-brand-accent hover:text-brand shadow-sm"
-                      }`}
+                            ? "bg-brand/5 text-brand/20 border-transparent cursor-not-allowed line-through opacity-50"
+                            : "bg-white text-brand/70 border-brand/5 hover:border-brand-accent hover:text-brand shadow-sm"
+                        }`}
                     >
                       {size}
                     </button>
@@ -304,59 +301,59 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
-            {/* Customisation Tooltip/Banner */}
-            {product.isCustomizable && enabledMeasurementsList.length === 0 && (
-              <div className="mb-10 p-5 rounded-2xl bg-brand/5 border border-brand/5 flex items-center justify-between group cursor-pointer hover:bg-brand/10 transition-all" onClick={() => setDrawerOpen(true)}>
-                <div className="flex items-center space-x-4">
-                  <div className="bg-white p-3 rounded-xl text-brand-accent shadow-sm group-hover:scale-110 transition-transform">
-                    <Sparkles size={20} />
-                  </div>
-                  <div>
-                    <div className="text-brand font-bold text-sm">Bespoke Customisation</div>
-                    <div className="text-brand/60 text-xs mt-1">Refine measurements for a perfect fit.</div>
-                  </div>
-                </div>
-                <div className="text-brand-accent">
-                  <ArrowLeft size={18} className="rotate-180" />
-                </div>
-              </div>
-            )}
-
-            {/* Custom Fit Section */}
+            {/* Custom Fit Section - Interactive Dropdown */}
             {product.isCustomizable && enabledMeasurementsList.length > 0 && (
               <div className="mb-12">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-brand-accent/10 rounded-lg text-brand-accent">
-                      <Sparkles size={16} />
+                <button 
+                  onClick={() => setIsCustomOpen(!isCustomOpen)}
+                  className="w-full flex items-center justify-between p-6 rounded-3xl transition-all border-2 shadow-sm bg-brand text-white border-brand hover:bg-brand-hover"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-2xl bg-white/20 text-white transition-all">
+                      <Sparkles size={20} />
                     </div>
-                    <span className="text-sm font-black text-brand uppercase tracking-widest">3. Customize My Fit (Inches)</span>
+                    <div className="text-left">
+                      <span className="text-sm font-black uppercase tracking-widest block text-white">3. Customize My Fit (Inches)</span>
+                      <p className="text-[10px] font-medium mt-1 text-white/70">
+                        {isCustomOpen ? "Refining your bespoke measurements" : "Click to provide your exact measurements"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="bg-brand/5 rounded-3xl p-6 border border-brand/5">
-                  <div className="grid grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                    {enabledMeasurementsList.map((m) => (
-                      <div key={m} className="flex flex-col space-y-2">
-                        <label className="text-[10px] font-black text-brand/40 uppercase tracking-widest pl-1">{m}</label>
-                        <select 
-                          value={measurements[m] || ""} 
-                          onChange={(e) => setMeasurements(prev => ({ ...prev, [m]: e.target.value }))}
-                          className="w-full bg-white border border-brand/10 rounded-xl px-4 py-3 text-xs font-bold text-brand outline-none focus:border-brand-accent transition-all"
+                  <div className={`transition-transform duration-500 ${isCustomOpen ? "rotate-180" : "rotate-0"}`}>
+                    <ArrowLeft size={20} className="-rotate-90 text-white" />
+                  </div>
+                </button>
+
+                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isCustomOpen ? "max-h-[500px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
+                  <div className="bg-white rounded-3xl p-6 border-2 border-brand/10 shadow-lg">
+                    <div className="grid grid-cols-2 gap-5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {enabledMeasurementsList.map((m) => (
+                        <div key={m} className="flex flex-col space-y-2">
+                          <label className="text-[10px] font-black text-brand/40 uppercase tracking-widest pl-1">{m}</label>
+                          <select
+                            value={measurements[m] || ""}
+                            onChange={(e) => setMeasurements(prev => ({ ...prev, [m]: e.target.value }))}
+                            className="w-full bg-brand/5 border border-brand/10 rounded-xl px-4 py-3 text-xs font-bold text-brand outline-none focus:border-brand-accent transition-all hover:bg-brand/10"
+                          >
+                            <option value="">Select</option>
+                            {Array.from({ length: 991 }, (_, i) => (1.0 + i * 0.1).toFixed(1)).map(val => (
+                              <option key={val} value={val}>{val}"</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-6 pt-6 border-t border-brand/10 flex items-center justify-between">
+                      <p className="text-[9px] text-brand/40 font-medium italic">* Measurements are in inches (")</p>
+                      {Object.keys(measurements).length > 0 && (
+                        <button
+                          onClick={() => setMeasurements({})}
+                          className="text-[9px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors"
                         >
-                          <option value="">Select</option>
-                          {Array.from({ length: 991 }, (_, i) => (1.0 + i * 0.1).toFixed(1)).map(val => (
-                            <option key={val} value={val}>{val}"</option>
-                          ))}
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-brand/10 flex items-center justify-between">
-                    <p className="text-[9px] text-brand/40 font-medium italic">* Measurements are in inches (")</p>
-                    {Object.keys(measurements).length > 0 && (
-                      <button onClick={() => setMeasurements({})} className="text-[9px] font-black text-red-400 uppercase tracking-widest">Reset</button>
-                    )}
+                          Reset All
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -364,14 +361,13 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
             {/* Add to Cart */}
             <div className="mt-auto pt-6 border-t border-brand/5">
-              <button 
+              <button
                 disabled={!!(selectedColor && selectedSize && currentStock === 0)}
                 onClick={handleAddToCart}
-                className={`w-full flex items-center justify-center space-x-3 font-bold py-4 rounded-2xl transition-all text-base shadow-xl ${
-                  selectedColor && selectedSize && currentStock === 0
+                className={`w-full flex items-center justify-center space-x-3 font-bold py-4 rounded-2xl transition-all text-base shadow-xl ${selectedColor && selectedSize && currentStock === 0
                     ? "bg-brand/10 text-brand/30 cursor-not-allowed"
                     : "bg-brand text-white hover:bg-brand-hover active:scale-[0.98] border border-transparent hover:border-brand-accent"
-                }`}
+                  }`}
               >
                 {added ? (
                   <Check size={22} className="text-brand-accent animate-in zoom-in duration-300" />
@@ -396,14 +392,6 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         )}
       </main>
 
-      {product && (
-        <RefineDrawer 
-          isOpen={isDrawerOpen} 
-          onClose={() => setDrawerOpen(false)} 
-          baseSize={selectedSize || "M"}
-        />
-      )}
-
       {/* Size Guide Modal */}
       {isSizeGuideOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -411,33 +399,33 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
             <div className="p-8 border-b border-brand/5 flex items-center justify-between bg-brand/5">
               <h2 className="text-2xl font-serif font-bold text-brand">Size Guide</h2>
-              <button 
+              <button
                 onClick={() => setIsSizeGuideOpen(false)}
                 className="p-2 hover:bg-brand/10 rounded-full transition-all"
               >
                 <X size={24} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               <div className="flex justify-center mb-8 bg-brand/5 p-2 rounded-2xl">
-                <button 
+                <button
                   className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${product.gender === 'men' ? 'bg-brand text-white shadow-lg' : 'text-brand/40 hover:text-brand'}`}
-                  onClick={() => setProduct(p => p ? {...p, gender: 'men'} : null)}
+                  onClick={() => setProduct(p => p ? { ...p, gender: 'men' } : null)}
                 >
                   Men's Guide
                 </button>
-                <button 
+                <button
                   className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${product.gender === 'women' ? 'bg-brand text-white shadow-lg' : 'text-brand/40 hover:text-brand'}`}
-                  onClick={() => setProduct(p => p ? {...p, gender: 'women'} : null)}
+                  onClick={() => setProduct(p => p ? { ...p, gender: 'women' } : null)}
                 >
                   Women's Guide
                 </button>
               </div>
 
               <div className="relative aspect-[3/4] w-full rounded-2xl overflow-hidden border border-brand/5 bg-white">
-                <img 
-                  src={product.gender === 'men' ? "/images/guides/male.jpg" : "/images/guides/female.jpg"} 
+                <img
+                  src={product.gender === 'men' ? "/images/guides/male.jpg" : "/images/guides/female.jpg"}
                   alt={`${product.gender} Size Guide`}
                   className="w-full h-full object-contain"
                   onError={(e) => {
@@ -445,7 +433,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                   }}
                 />
               </div>
-              
+
               <div className="mt-8 space-y-4">
                 <h4 className="text-xs font-black text-brand uppercase tracking-widest">How to Measure?</h4>
                 <p className="text-xs text-brand/60 leading-relaxed">
@@ -463,9 +451,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6 bg-brand/5 border-t border-brand/5 flex justify-center">
-              <button 
+              <button
                 onClick={() => setIsSizeGuideOpen(false)}
                 className="bg-brand text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-brand-hover transition-all shadow-xl"
               >

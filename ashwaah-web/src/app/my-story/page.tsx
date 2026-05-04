@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Mail, Phone, Camera, Share2, Send, MapPin, Sparkles } from "lucide-react";
+import { Mail, Phone, Camera, Share2, Send, MessageCircle, Sparkles } from "lucide-react";
 
 
 export default function MyStory() {
@@ -11,7 +11,7 @@ export default function MyStory() {
 
 
       {/* Narrative Section */}
-      <section className="max-w-6xl mx-auto px-6 py-12 md:py-16 relative">
+      <section className="max-w-6xl mx-auto px-6 pt-4 pb-12 md:pt-8 md:pb-16 relative">
         <div className="absolute -right-20 top-40 w-64 h-64 bg-[#C5A059]/10 rounded-full blur-[100px]"></div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center relative z-10">
@@ -19,7 +19,7 @@ export default function MyStory() {
             <div className="absolute -inset-4 bg-[#C5A059]/20 rounded-[3rem] blur-2xl group-hover:bg-[#C5A059]/30 transition-all duration-700"></div>
             <div className="relative rounded-[2.5rem] overflow-hidden border border-[#C5A059]/10 shadow-xl aspect-square">
               <img 
-                src="/ashwaah_founder_portrait_1777553264552.png" 
+                src="/images/Owner-profile.jpg" 
                 alt="Boutique Owner" 
                 className="w-full h-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-1000 scale-105 hover:scale-100"
               />
@@ -37,8 +37,9 @@ export default function MyStory() {
 
             <div className="space-y-4 text-lg text-[#1B3022]/70 font-medium leading-relaxed">
               <p>
-                Ashwaah is a luxury boutique dedicated to the art of custom-fit apparel. We blend heritage craftsmanship with modern elegance to create timeless pieces.
-              </p>
+I am Ashwini Gowda, a woman whose journey began in the serene village of Siddhapura, Karnataka, a place known for the breathtaking Jog Falls. From these humble roots, my passion for fashion grew into a mission—to redefine style by blending fashion with comfort and making it accessible, sustainable, and empowering.
+
+Fashion, to me, is not just about trends—it is about identity, confidence, and the way we carry ourselves. I wanted to create a path where comfort meets couture, and that vision gave birth to my brand.              </p>
               <p>
                 Every garment we create is a story of quality, precision, and passion—designed to empower your unique expression.
               </p>
@@ -83,15 +84,15 @@ export default function MyStory() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-6 group">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-[#C5A059] transition-all duration-500">
-                  <MapPin size={20} className="text-[#C5A059] group-hover:text-white" />
+              <a href="https://wa.me/917673963808" target="_blank" rel="noopener noreferrer" className="flex items-center gap-6 group">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-[#25D366] transition-all duration-500">
+                  <MessageCircle size={20} className="text-[#C5A059] group-hover:text-white" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Visit Us</p>
-                  <p className="text-lg font-bold">Designer Studio, Bangalore, India</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">WhatsApp Us</p>
+                  <p className="text-lg font-bold">+91 76739 63808</p>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
           

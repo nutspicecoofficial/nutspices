@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { products, productVariations, orderItems, cartItems, orders } from "@/db/schema";
-import { eq, like, or, sql } from "drizzle-orm";
+import { eq, like, or, sql, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 async function isAdmin() {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     // Fetch products
     const allProducts = await db.select().from(products).where(
       search ? or(like(products.name, `%${search}%`), like(products.category, `%${search}%`)) : undefined
-    );
+    ).orderBy(desc(products.id));
     
     // Fetch all variations for stock calculation
     const allVariations = await db.select().from(productVariations);
@@ -172,27 +172,36 @@ export async function PATCH(request: Request) {
     if (!id) return NextResponse.json({ success: false, error: "ID is required" }, { status: 400 });
 
     // Pricing from variations
-    const basePriceValue = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.basePrice) || 0)) : 0;
-    const baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.salePrice) || 0)) : 0;
+    let basePriceValue: number | undefined;
+    let baseSalePrice: number | undefined;
+    if (variations) {
+      basePriceValue = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.basePrice) || 0)) : 0;
+      baseSalePrice = variations && variations.length > 0 ? Math.min(...variations.map((v: any) => Number(v.salePrice) || 0)) : 0;
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (variations) {
+      updateData.basePrice = basePriceValue;
+      updateData.salePrice = baseSalePrice;
+    }
+    if (images !== undefined) updateData.images = JSON.stringify(images);
+    if (colors !== undefined) updateData.colors = JSON.stringify(colors);
+    if (avgRating !== undefined) updateData.avgRating = !isNaN(parseFloat(avgRating)) ? parseFloat(avgRating) : undefined;
+    if (numReviews !== undefined) updateData.numReviews = !isNaN(parseInt(numReviews)) ? parseInt(numReviews) : undefined;
+    if (category !== undefined) updateData.category = category;
+    if (gender !== undefined) updateData.gender = gender;
+    if (tags !== undefined) updateData.tags = tags;
+    if (isFeatured !== undefined) updateData.isFeatured = !!isFeatured;
+    if (isCustomizable !== undefined) updateData.isCustomizable = !!isCustomizable;
+    if (enabledMeasurements !== undefined) updateData.enabledMeasurements = enabledMeasurements;
 
     // 1 & 2. Update Product and Variations in a Transaction
     db.transaction((tx) => {
-      tx.update(products).set({
-        name,
-        description: description || null,
-        basePrice: basePriceValue,
-        salePrice: baseSalePrice,
-        images: JSON.stringify(images || []),
-        colors: JSON.stringify(colors || []),
-        avgRating: !isNaN(parseFloat(avgRating)) ? parseFloat(avgRating) : 4.3,
-        numReviews: !isNaN(parseInt(numReviews)) ? parseInt(numReviews) : 1,
-        category: category || null,
-        gender: gender || "unisex",
-        tags: tags || null,
-        isFeatured: !!isFeatured,
-        isCustomizable: !!isCustomizable,
-        enabledMeasurements: enabledMeasurements || null,
-      }).where(eq(products.id, id)).run();
+      if (Object.keys(updateData).length > 0) {
+        tx.update(products).set(updateData).where(eq(products.id, id)).run();
+      }
 
       if (variations) {
         tx.delete(productVariations).where(eq(productVariations.productId, id)).run();

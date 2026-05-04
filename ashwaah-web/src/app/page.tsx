@@ -50,6 +50,27 @@ export default function Home() {
 
       {/* Featured Collections Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        {/* Category Banners */}
+        <section className="max-w-4xl mx-auto">
+          <div className="flex justify-center gap-12 md:gap-24 mt-12">
+            {/* Men's Circle */}
+            <Link href="/category/mens" className="group flex flex-col items-center">
+              <div className="w-40 h-40 md:w-56 md:h-56 rounded-full overflow-hidden border-2 border-brand/10 shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:border-brand-accent">
+                <img src="/images/mens_banner.png" alt="Men" className="w-full h-full object-cover" />
+              </div>
+              <span className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-brand/60 group-hover:text-brand-accent transition-colors">Men</span>
+            </Link>
+
+            {/* Women's Circle */}
+            <Link href="/category/womens" className="group flex flex-col items-center">
+              <div className="w-40 h-40 md:w-56 md:h-56 rounded-full overflow-hidden border-2 border-brand/10 shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:border-brand-accent">
+                <img src="/images/womens_banner.png" alt="Women" className="w-full h-full object-cover" />
+              </div>
+              <span className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-brand/60 group-hover:text-brand-accent transition-colors">Women</span>
+            </Link>
+          </div>
+        </section>
+
         <ProductGrid />
       </main>
 

@@ -319,7 +319,7 @@ export default function MyOrdersPage() {
                         <AlertTriangle size={18} />
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-widest">Order Cancelled</p>
-                          <p className="text-[9px] font-medium opacity-70">A refund will be initiated if payment was captured.</p>
+                          <p className="text-[9px] font-medium opacity-70">A refund will be initiated if payment was captured. Amount will be credited within 7 to 9 business days.</p>
                         </div>
                       </div>
                     </div>
