@@ -14,13 +14,11 @@ export async function GET() {
     }
 
     // Find user
-    const user = await db.query.users.findFirst({
-      where: eq(users.phoneNumber, phoneNumber),
-    });
-
-    if (!user) {
+    const userRows = await db.select().from(users).where(eq(users.phoneNumber, phoneNumber)).limit(1);
+    if (!userRows.length) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
+    const user = userRows[0];
 
     const userOrders = await db.select({
       id: orders.id,

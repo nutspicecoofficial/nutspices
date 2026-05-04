@@ -31,6 +31,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "most-selling" | "low-stock" | "out-of-stock">("all");
 
   useEffect(() => {
     fetchInventory();
@@ -61,10 +62,21 @@ export default function InventoryPage() {
   };
 
   const filteredData = Object.entries(data).reduce((acc, [category, products]) => {
-    const filtered = products.filter(p => 
+    let filtered = products.filter(p => 
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Apply Tab Filters
+    if (activeTab === "most-selling") {
+      // For Most Selling, we still show by category but products must have at least 1 sale
+      filtered = filtered.filter(p => p.sold > 0).sort((a, b) => b.sold - a.sold);
+    } else if (activeTab === "low-stock") {
+      filtered = filtered.filter(p => p.remaining < 10 && p.remaining > 0);
+    } else if (activeTab === "out-of-stock") {
+      filtered = filtered.filter(p => p.remaining === 0);
+    }
+
     if (filtered.length > 0) {
       acc[category] = filtered;
     }
@@ -79,6 +91,13 @@ export default function InventoryPage() {
       </div>
     );
   }
+
+  const tabs = [
+    { id: "all", label: "All Products", icon: Package },
+    { id: "most-selling", label: "Most Selling", icon: TrendingUp },
+    { id: "low-stock", label: "Near Out of Stock", icon: AlertCircle },
+    { id: "out-of-stock", label: "Out of Stock", icon: Box },
+  ];
 
   return (
     <div className="pb-20 px-8 pt-8">
@@ -99,6 +118,31 @@ export default function InventoryPage() {
             className="w-full bg-white border border-brand/10 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold text-brand focus:outline-none focus:ring-4 focus:ring-[#C5A059]/5 transition-all shadow-sm"
           />
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 mb-10 p-1.5 bg-brand/5 rounded-2xl w-fit">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`
+                flex items-center space-x-2 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all
+                ${isActive 
+                  ? "bg-brand text-brand-accent shadow-lg shadow-brand/20 scale-105" 
+                  : "text-brand/40 hover:text-brand hover:bg-white"
+                }
+              `}
+            >
+              <Icon size={14} />
+              <span>{tab.label}</span>
+              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-brand-accent ml-1" />}
+            </button>
+          );
+        })}
       </div>
 
       {/* Categories */}
@@ -163,11 +207,11 @@ export default function InventoryPage() {
                           </div>
                         </div>
                         
-                        <div className={`p-4 rounded-2xl border text-center ${product.remaining <= 5 ? 'bg-red-50/50 border-red-100/50' : 'bg-brand/5 border-brand/5'}`}>
-                          <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${product.remaining <= 5 ? 'text-red-600' : 'text-brand/40'}`}>Remaining</p>
+                        <div className={`p-4 rounded-2xl border text-center ${product.remaining < 10 ? 'bg-red-50/50 border-red-100/50' : 'bg-brand/5 border-brand/5'}`}>
+                          <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${product.remaining < 10 ? 'text-red-600' : 'text-brand/40'}`}>Remaining</p>
                           <div className="flex items-center justify-center space-x-1">
-                            {product.remaining <= 5 && <AlertCircle size={12} className="text-red-500" />}
-                            <p className={`text-lg font-black ${product.remaining <= 5 ? 'text-red-700' : 'text-brand'}`}>{product.remaining}</p>
+                            {product.remaining < 10 && <AlertCircle size={12} className="text-red-500" />}
+                            <p className={`text-lg font-black ${product.remaining < 10 ? 'text-red-700' : 'text-brand'}`}>{product.remaining}</p>
                           </div>
                         </div>
 
@@ -181,7 +225,7 @@ export default function InventoryPage() {
                       </div>
 
                       {/* Low Stock Warning */}
-                      {product.remaining <= 5 && product.remaining > 0 && (
+                      {product.remaining < 10 && product.remaining > 0 && (
                         <div className="mt-4 py-2 px-3 bg-red-600 text-white rounded-xl flex items-center justify-center space-x-2 animate-pulse">
                           <AlertCircle size={12} />
                           <span className="text-[9px] font-black uppercase tracking-widest">Low Stock Warning</span>

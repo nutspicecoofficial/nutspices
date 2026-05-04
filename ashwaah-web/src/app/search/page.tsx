@@ -14,6 +14,8 @@ interface Product {
   basePrice: number;
   images: string; // JSON string
   category?: string;
+  isFeatured: boolean | number | null;
+  isCustomizable: boolean | number | null;
 }
 
 function SearchResults() {

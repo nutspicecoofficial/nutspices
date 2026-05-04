@@ -26,6 +26,10 @@ interface Product {
   basePrice: number; salePrice: number; images: string;
   avgRating: number; numReviews: number; category: string | null;
   gender: string | null; totalStock: number;
+  isFeatured: boolean | number | null;
+  isCustomizable: boolean | number | null;
+  enabledMeasurements: string | null;
+  tags: string | null;
 }
 
 const LABEL = "block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-3";
@@ -38,6 +42,9 @@ export default function ProductManagement() {
   const [toast, setToast] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [stockEditingProduct, setStockEditingProduct] = useState<any>(null);
+  const [stockVariations, setStockVariations] = useState<Variation[]>([]);
 
   // ── Form state ──────────────────────────────────────────────
   const [name, setName] = useState("");
@@ -241,11 +248,146 @@ export default function ProductManagement() {
     } catch { showToast("Network error."); }
   };
 
+  const handleStockUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockEditingProduct) return;
+    
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          id: stockEditingProduct.id, 
+          name: stockEditingProduct.name,
+          variations: stockVariations 
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("✓ Stock updated successfully!");
+        fetchProducts();
+        setStockModalOpen(false);
+      } else {
+        showToast(data.error || "Failed to update stock");
+      }
+    } catch {
+      showToast("Network error.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openStockModal = async (product: Product) => {
+    setStockEditingProduct(product);
+    setStockModalOpen(true);
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/admin/products?id=${product.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setStockVariations(data.data.variations || []);
+      }
+    } catch {
+      showToast("Failed to load variations.");
+      setStockModalOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="h-full w-full overflow-hidden">
       {toast && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#1B3022] text-[#C5A059] px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 font-bold text-sm">
           <Check size={18} /><span>{toast}</span>
+        </div>
+      )}
+
+      {/* ─── QUICK STOCK MODAL ────────────────────────── */}
+      {stockModalOpen && stockEditingProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-brand/40 backdrop-blur-sm" onClick={() => !isSubmitting && setStockModalOpen(false)} />
+          <div className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl border border-brand/5 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-brand/5 flex items-center justify-between bg-brand/5">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden border border-brand/10">
+                  <img src={JSON.parse(stockEditingProduct.images || "[]")[0]} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-playfair font-bold text-brand">Quick Stock Update</h2>
+                  <p className="text-[10px] font-black text-brand/30 uppercase tracking-widest">{stockEditingProduct.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setStockModalOpen(false)} className="p-2 hover:bg-brand/10 rounded-xl transition-all">
+                <X size={20} className="text-brand/40" />
+              </button>
+            </div>
+
+            <form onSubmit={handleStockUpdate} className="p-8">
+              <div className="max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-8">
+                <table className="w-full text-left">
+                  <thead className="text-[10px] font-black text-brand/30 uppercase tracking-widest">
+                    <tr>
+                      <th className="pb-4 px-2">Variation</th>
+                      <th className="pb-4 px-2">Current Stock</th>
+                      <th className="pb-4 px-2">New Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand/5">
+                    {stockVariations.map((v, idx) => (
+                      <tr key={idx} className="group">
+                        <td className="py-4 px-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-bold text-brand">{v.size}</span>
+                            {v.color && v.color !== "Default" && (
+                              <div className="flex items-center space-x-1.5 bg-brand/5 px-2 py-0.5 rounded-full">
+                                <div className="w-2 h-2 rounded-full border border-white" style={{ backgroundColor: v.color.startsWith("#") ? v.color : PRESET_COLORS.find(c => c.name === v.color)?.hex }} />
+                                <span className="text-[9px] font-bold text-brand/60 uppercase">{v.color}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-2">
+                          <span className={`text-xs font-black ${v.stock < 10 ? "text-red-500" : "text-brand/40"}`}>{v.stock}</span>
+                        </td>
+                        <td className="py-4 px-2">
+                          <input 
+                            type="number" 
+                            min="0"
+                            value={v.stock}
+                            onChange={(e) => {
+                              const newVal = parseInt(e.target.value) || 0;
+                              setStockVariations(prev => prev.map((item, i) => i === idx ? { ...item, stock: newVal } : item));
+                            }}
+                            className="w-24 bg-brand/5 border-2 border-transparent focus:border-brand-accent/30 rounded-xl px-4 py-2 text-xs font-black text-brand outline-none transition-all"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  type="button" 
+                  onClick={() => setStockModalOpen(false)}
+                  className="flex-1 px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-brand/40 hover:bg-brand/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="flex-[2] bg-brand text-brand-accent px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-brand/20 transition-all flex items-center justify-center space-x-2"
+                >
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  <span>Save Stock Levels</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -593,8 +735,8 @@ export default function ProductManagement() {
                           <td className="px-5 py-3 font-bold text-brand">{v.size}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center space-x-2">
-                              {v.color !== "Default" && <span className="w-3 h-3 rounded-full border border-white shadow" style={{ backgroundColor: v.color.startsWith("#") ? v.color : PRESET_COLORS.find(c => c.name === v.color)?.hex }} />}
-                              <span className="text-brand/60 font-medium">{v.color !== "Default" ? v.color : "—"}</span>
+                              {v.color && v.color !== "Default" && <span className="w-3 h-3 rounded-full border border-white shadow" style={{ backgroundColor: v.color.startsWith("#") ? v.color : PRESET_COLORS.find(c => c.name === v.color)?.hex }} />}
+                              <span className="text-brand/60 font-medium">{v.color && v.color !== "Default" ? v.color : "—"}</span>
                             </div>
                           </td>
                           <td className="px-5 py-3">
@@ -715,9 +857,16 @@ export default function ProductManagement() {
                           {off > 0 && <span className="text-[8px] text-green-600 font-bold">{off}% OFF</span>}
                         </div>
                         <div className="flex items-center justify-between mt-2">
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${(product.totalStock || 0) > 10 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               openStockModal(product);
+                             }}
+                             title="Click to manage stock"
+                             className={`text-[8px] font-black px-2 py-0.5 rounded-full hover:scale-105 active:scale-95 transition-all cursor-pointer ${(product.totalStock || 0) > 10 ? "bg-green-50 text-green-600 border border-green-100" : "bg-red-50 text-red-600 border border-red-100"}`}
+                           >
                             {product.totalStock || 0} STOCK
-                          </span>
+                          </button>
                           <div className="flex space-x-1">
                             <button onClick={() => handleEdit(product.id)} className={`p-1.5 rounded-lg transition-all ${isCurrentlyEditing ? "bg-brand text-white" : "bg-brand/5 text-brand hover:bg-brand hover:text-white"}`}><Edit3 size={10} /></button>
                             <button onClick={() => handleDelete(product.id)} className="p-1.5 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={10} /></button>

@@ -136,14 +136,16 @@ export async function POST(request: Request) {
       try {
         const cookieStore = await cookies();
         const cookieName = portal === "admin" ? "admin_session" : "auth_session";
+        const isSecure = request.url.startsWith("https");
+
         cookieStore.set(cookieName, phone, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: isSecure,
           sameSite: "lax",
           maxAge: 60 * 60 * 24 * 30, // 30 days
           path: "/",
         });
-        console.log(`[Auth Request ${requestId}] ${cookieName} set for ${phone}`);
+        console.log(`[Auth Request ${requestId}] ${cookieName} set for ${phone} (Secure: ${isSecure})`);
       } catch (cookieError) {
         console.error(`[Auth Request ${requestId}] Cookie Error:`, cookieError);
       }

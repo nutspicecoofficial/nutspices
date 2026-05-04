@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Users, 
   ShoppingBag, 
@@ -19,6 +20,7 @@ type Stats = {
 };
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -121,7 +123,6 @@ export default function AdminDashboard() {
         })}
       </div>
 
-      {/* Recent Activity / Quick Actions Placeholder */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-brand/5">
           <h3 className="text-xl font-playfair font-bold text-brand mb-6">System Status</h3>
@@ -147,12 +148,18 @@ export default function AdminDashboard() {
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#C5A059]/10 rounded-full blur-3xl group-hover:bg-[#C5A059]/20 transition-colors"></div>
           <h3 className="text-xl font-playfair font-bold text-white mb-6 relative z-10">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-4 relative z-10">
-            <button className="bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all text-left">
-              <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-1">Products</p>
+            <button 
+              onClick={() => router.push("/admin/products")}
+              className="bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all text-left group/btn shadow-lg"
+            >
+              <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-1 group-hover/btn:translate-x-1 transition-transform">Products</p>
               <p className="text-sm font-bold text-white">Add New</p>
             </button>
-            <button className="bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all text-left">
-              <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-1">Menus</p>
+            <button 
+              onClick={() => router.push("/admin/navigation")}
+              className="bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all text-left group/btn shadow-lg"
+            >
+              <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-1 group-hover/btn:translate-x-1 transition-transform">Menus</p>
               <p className="text-sm font-bold text-white">Manage Nav</p>
             </button>
           </div>

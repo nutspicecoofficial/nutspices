@@ -40,6 +40,7 @@ export default function AdminLogin() {
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "send", phone }),
       });
       const data = await res.json();
@@ -65,6 +66,7 @@ export default function AdminLogin() {
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify", phone, otp, portal: "admin" }),
       });
       const data = await res.json();

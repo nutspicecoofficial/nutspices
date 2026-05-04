@@ -4,33 +4,35 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 
+// Helper: get user by phone from cookie
+async function getUserFromCookie() {
+  const cookieStore = await cookies();
+  const phoneNumber = cookieStore.get("auth_session")?.value;
+  if (!phoneNumber) return { user: null, phoneNumber: null };
+
+  const rows = await db.select().from(users).where(eq(users.phoneNumber, phoneNumber)).limit(1);
+  return { user: rows[0] ?? null, phoneNumber };
+}
+
+// Helper: parse stored address field → string[]
+function parseAddresses(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [raw];
+  } catch {
+    return [raw];
+  }
+}
+
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const phoneNumber = cookieStore.get("auth_session")?.value;
-
-    if (!phoneNumber) {
+    const { user } = await getUserFromCookie();
+    if (!user) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.phoneNumber, phoneNumber),
-    });
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
-    }
-
-    let addresses: string[] = [];
-    if (user.address) {
-      try {
-        addresses = JSON.parse(user.address);
-        if (!Array.isArray(addresses)) addresses = [user.address];
-      } catch {
-        addresses = [user.address];
-      }
-    }
-
+    const addresses = parseAddresses(user.address);
     return NextResponse.json({ success: true, addresses });
   } catch (error) {
     console.error("Address GET Error:", error);
@@ -41,29 +43,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { address } = await req.json();
-    const cookieStore = await cookies();
-    const phoneNumber = cookieStore.get("auth_session")?.value;
+    const { user, phoneNumber } = await getUserFromCookie();
 
-    if (!phoneNumber) {
+    if (!user || !phoneNumber) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.phoneNumber, phoneNumber),
-    });
-
-    if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
-
-    let addresses: string[] = [];
-    if (user.address) {
-      try {
-        addresses = JSON.parse(user.address);
-        if (!Array.isArray(addresses)) addresses = [user.address];
-      } catch {
-        addresses = [user.address];
-      }
-    }
-
+    const addresses = parseAddresses(user.address);
     if (!addresses.includes(address)) {
       addresses.push(address);
     }
@@ -82,30 +68,13 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { address } = await req.json();
-    const cookieStore = await cookies();
-    const phoneNumber = cookieStore.get("auth_session")?.value;
+    const { user, phoneNumber } = await getUserFromCookie();
 
-    if (!phoneNumber) {
+    if (!user || !phoneNumber) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.phoneNumber, phoneNumber),
-    });
-
-    if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
-
-    let addresses: string[] = [];
-    if (user.address) {
-      try {
-        addresses = JSON.parse(user.address);
-        if (!Array.isArray(addresses)) addresses = [user.address];
-      } catch {
-        addresses = [user.address];
-      }
-    }
-
-    addresses = addresses.filter(a => a !== address);
+    const addresses = parseAddresses(user.address).filter((a) => a !== address);
 
     await db.update(users)
       .set({ address: addresses.length > 0 ? JSON.stringify(addresses) : null })

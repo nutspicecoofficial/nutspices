@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { products, productVariations, orderItems, cartItems } from "@/db/schema";
+import { products, productVariations, orderItems, cartItems, orders } from "@/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 
@@ -33,30 +33,48 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: { ...product[0], variations: mappedVariations } });
     }
     
-    // Fetch products with their total stock
-    const results = await db.select({
-      id: products.id,
-      name: products.name,
-      description: products.description,
-      basePrice: products.basePrice,
-      salePrice: products.salePrice,
-      images: products.images,
-      avgRating: products.avgRating,
-      numReviews: products.numReviews,
-      category: products.category,
-      gender: products.gender,
-      isFeatured: products.isFeatured,
-      tags: products.tags,
-      colors: products.colors,
-      enabledMeasurements: products.enabledMeasurements,
-      totalStock: sql<number>`SUM(${productVariations.stock})`.mapWith(Number)
-    })
-    .from(products)
-    .leftJoin(productVariations, eq(products.id, productVariations.productId))
-    .where(
+    // Fetch products
+    const allProducts = await db.select().from(products).where(
       search ? or(like(products.name, `%${search}%`), like(products.category, `%${search}%`)) : undefined
-    )
-    .groupBy(products.id);
+    );
+    
+    // Fetch all variations for stock calculation
+    const allVariations = await db.select().from(productVariations);
+
+    // Fetch all order items and their associated order status
+    const allOrderItems = await db
+      .select({
+        productId: orderItems.productId,
+        quantity: orderItems.quantity,
+        status: orders.status,
+      })
+      .from(orderItems)
+      .leftJoin(orders, eq(orderItems.orderId, orders.id));
+
+    // Process data to calculate metrics
+    const results = allProducts.map((product: any) => {
+      const productOrderItems = allOrderItems.filter(item => item.productId === product.id);
+      const productVariationsList = allVariations.filter(v => v.productId === product.id);
+
+      const sold = productOrderItems
+        .filter(item => item.status && item.status.toLowerCase() === "delivered")
+        .reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+      const toDeliver = productOrderItems
+        .filter(item => 
+          item.status && 
+          ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery"].includes(item.status.toLowerCase())
+        )
+        .reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+      const initialStock = productVariationsList?.reduce((sum: number, v: any) => sum + (v.stock || 0), 0) || 0;
+      const totalStock = Math.max(0, initialStock - sold - toDeliver);
+
+      return {
+        ...product,
+        totalStock
+      };
+    });
 
     return NextResponse.json({ success: true, data: results });
   } catch (error) {
@@ -218,22 +236,38 @@ export async function DELETE(request: Request) {
 
     if (!id) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
 
-    // 1. Check if product exists in orders
-    const hasOrders = await db.select().from(orderItems).where(eq(orderItems.productId, id)).limit(1);
-    if (hasOrders.length > 0) {
+    // 1. Fetch all order items for this product along with their order status
+    const relatedOrderItems = await db
+      .select({ id: orderItems.id, status: orders.status })
+      .from(orderItems)
+      .leftJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(eq(orderItems.productId, id))
+      .all();
+
+    // 2. Block deletion only if there are ACTIVE (non-completed) orders
+    const activeStatuses = ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery"];
+    const hasActiveOrders = relatedOrderItems.some(
+      (item) => item.status && activeStatuses.includes(item.status.toLowerCase())
+    );
+
+    if (hasActiveOrders) {
       return NextResponse.json({ 
         success: false, 
-        error: "Cannot delete product with existing orders. Please disable it instead (coming soon)." 
+        error: "Cannot delete: this product has active pending/shipped orders. Wait for them to complete first." 
       }, { status: 400 });
     }
 
-    // 2. Perform deletion in transaction
+    // 3. Perform deletion in a transaction
     db.transaction((tx) => {
+      // Nullify productId in completed order items to preserve order history
+      if (relatedOrderItems.length > 0) {
+        tx.update(orderItems).set({ productId: null }).where(eq(orderItems.productId, id)).run();
+      }
       // Delete variations
       tx.delete(productVariations).where(eq(productVariations.productId, id)).run();
-      // Delete from cart
+      // Remove from any active carts
       tx.delete(cartItems).where(eq(cartItems.productId, id)).run();
-      // Finally delete product
+      // Finally delete the product itself
       tx.delete(products).where(eq(products.id, id)).run();
     });
 

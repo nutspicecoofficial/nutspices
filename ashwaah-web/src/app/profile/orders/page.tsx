@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, ChevronRight, XCircle, AlertTriangle, Image as ImageIcon, MapPin } from "lucide-react";
+import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, XCircle, AlertTriangle, Image as ImageIcon, MapPin, Check, X } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 
 interface OrderItem {
   id: number;
@@ -39,7 +38,9 @@ const MILESTONES = [
 export default function MyOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -59,25 +60,30 @@ export default function MyOrdersPage() {
     }
   };
 
-  const handleCancelOrder = async (orderId: number) => {
-    if (!confirm("Are you sure you want to cancel this bespoke order? This action cannot be undone.")) return;
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
+  const handleCancelOrder = async (orderId: number) => {
+    setIsCancelling(true);
     try {
       const res = await fetch(`/api/profile/orders/${orderId}/cancel`, {
         method: "PATCH",
       });
       const data = await res.json();
       if (data.success) {
-        setToast("Order cancelled successfully");
+        showToast("Order cancelled successfully");
         fetchOrders();
       } else {
-        setToast(data.error || "Failed to cancel order");
+        showToast(data.error || "Failed to cancel order");
       }
     } catch (error) {
       console.error("Cancellation error:", error);
-      setToast("Something went wrong");
+      showToast("Something went wrong");
     } finally {
-      setTimeout(() => setToast(null), 3000);
+      setIsCancelling(false);
+      setConfirmingCancelId(null);
     }
   };
 
@@ -129,24 +135,30 @@ export default function MyOrdersPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 md:gap-8">
-                  <div className="min-w-[100px]">
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Status</p>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm border ${
-                      order.status === 'delivered' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
-                      order.status === 'cancelled' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
-                      'bg-[#C5A059]/20 text-[#C5A059] border-[#C5A059]/30'
-                    }`}>
-                      {order.status}
-                    </span>
+                <div className="flex flex-wrap items-start gap-4 md:gap-8">
+                  <div className="flex flex-col justify-center min-w-[100px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Status</p>
+                    <div className="flex items-center h-6">
+                      <span className={`inline-flex items-center px-3 py-0 h-6 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm border ${
+                        order.status === 'delivered' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
+                        order.status === 'cancelled' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 
+                        'bg-[#C5A059]/20 text-[#C5A059] border-[#C5A059]/30'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="min-w-[80px]">
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Date</p>
-                    <span className="text-[10px] font-bold text-white">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  <div className="flex flex-col justify-center min-w-[80px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Date</p>
+                    <div className="flex items-center h-6">
+                      <span className="text-[10px] font-bold text-white">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    </div>
                   </div>
-                  <div className="text-right min-w-[80px]">
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Total</p>
-                    <span className="text-lg font-black text-white tracking-tighter">₹{order.totalAmount.toLocaleString()}</span>
+                  <div className="flex flex-col justify-center text-right min-w-[80px]">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Total</p>
+                    <div className="flex items-center justify-end h-6">
+                      <span className="text-lg font-black text-white tracking-tighter">₹{order.totalAmount.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -218,15 +230,39 @@ export default function MyOrdersPage() {
                       <div className="flex items-start justify-between mb-1">
                         <h5 className="text-base font-bold text-brand">{item.productName}</h5>
                         
-                        {/* Compact Cancel Button Moved Here */}
+                        {/* Inline Cancel Confirmation */}
                         {idx === 0 && ["pending"].includes(order.status) && (
-                          <button 
-                            onClick={() => handleCancelOrder(order.id)}
-                            className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-all group/cancel"
-                          >
-                            <XCircle size={14} className="group-hover/cancel:rotate-90 transition-transform duration-300" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            {confirmingCancelId === order.id ? (
+                              <div className="flex items-center space-x-2 animate-in fade-in slide-in-from-right-2 duration-300">
+                                <span className="text-[8px] font-black uppercase tracking-widest text-red-500 bg-red-50 px-2 py-1 rounded-md">Confirm?</span>
+                                <button 
+                                  disabled={isCancelling}
+                                  onClick={() => handleCancelOrder(order.id)}
+                                  className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-sm flex items-center justify-center"
+                                  title="Confirm Cancel"
+                                >
+                                  {isCancelling ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                </button>
+                                <button 
+                                  disabled={isCancelling}
+                                  onClick={() => setConfirmingCancelId(null)}
+                                  className="p-1.5 bg-brand/5 text-brand/40 rounded-lg hover:bg-brand/10 transition-all"
+                                  title="Keep Order"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => setConfirmingCancelId(order.id)}
+                                className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-all group/cancel"
+                              >
+                                <XCircle size={14} className="group-hover/cancel:rotate-90 transition-transform duration-300" />
+                                <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
 
@@ -294,10 +330,10 @@ export default function MyOrdersPage() {
         </div>
       )}
       {/* Floating Toast Notification */}
-      {toast && (
+      {toastMsg && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#1B3022] text-[#C5A059] px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 font-bold text-xs animate-in fade-in slide-in-from-bottom-5 duration-300 border border-[#C5A059]/20">
           <CheckCircle2 size={16} />
-          <span className="uppercase tracking-widest">{toast}</span>
+          <span className="uppercase tracking-widest">{toastMsg}</span>
         </div>
       )}
     </div>

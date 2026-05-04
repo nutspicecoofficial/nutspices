@@ -42,6 +42,8 @@ interface Product {
   salePrice: number | null;
   mrp: number | null;
   category: string | null;
+  isFeatured: boolean | number | null;
+  isCustomizable: boolean | number | null;
 }
 
 interface Section {

@@ -269,7 +269,7 @@ export default function CartPage() {
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-dark/40 backdrop-blur-md animate-in fade-in duration-300">
           <div 
-            className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar"
+            className="bg-white rounded-[2.5rem] w-full max-w-xl p-8 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {paymentStep === "agreement" && (
@@ -345,9 +345,9 @@ export default function CartPage() {
                                 : 'border-brand/10 hover:border-brand/30'
                             }`}
                           >
-                            <div className="flex items-start justify-between">
-                              <p className="text-sm font-medium text-brand whitespace-pre-wrap">{addr}</p>
-                              {selectedAddressIndex === idx && <CheckCircle2 size={18} className="text-[#C5A059] flex-shrink-0 ml-4 mt-1" />}
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-medium text-brand whitespace-pre-wrap break-words min-w-0">{addr}</p>
+                              {selectedAddressIndex === idx && <CheckCircle2 size={18} className="text-[#C5A059] flex-shrink-0 mt-1" />}
                             </div>
                           </div>
                         ))}

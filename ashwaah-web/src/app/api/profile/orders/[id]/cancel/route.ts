@@ -17,36 +17,47 @@ export async function PATCH(
   }
 
   try {
-    // Find user
-    const user = await db.query.users.findFirst({
-      where: eq(users.phoneNumber, phoneNumber),
-    });
+    // Find user using plain select (no relational API needed)
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.phoneNumber, phoneNumber))
+      .limit(1);
 
-    if (!user) {
+    if (!userRows.length) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
+    const user = userRows[0];
     const orderId = parseInt(id);
 
-    // Fetch order to check current status
-    const order = await db.query.orders.findFirst({
-      where: and(eq(orders.id, orderId), eq(orders.userId, user.id)),
-    });
+    if (isNaN(orderId)) {
+      return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 });
+    }
 
-    if (!order) {
+    // Fetch the order (must belong to this user)
+    const orderRows = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.userId, user.id)))
+      .limit(1);
+
+    if (!orderRows.length) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
+    const order = orderRows[0];
+
     // Only allow cancellation if order is still pending
-    const cancellableStatuses = ["pending"];
-    if (!cancellableStatuses.includes(order.status || "")) {
-      return NextResponse.json({ 
-        success: false, 
-        error: `Cannot cancel order in '${order.status}' status.` 
+    if (order.status !== "pending") {
+      return NextResponse.json({
+        success: false,
+        error: `Cannot cancel an order with status '${order.status}'.`,
       }, { status: 400 });
     }
 
-    await db.update(orders)
+    await db
+      .update(orders)
       .set({ status: "cancelled" })
       .where(and(eq(orders.id, orderId), eq(orders.userId, user.id)));
 

@@ -28,14 +28,14 @@ export async function POST(request: Request) {
       await db.insert(users).values({
         phoneNumber: phone,
         role: phone === adminPhone ? "admin" : "user",
-        lastLoginAt: new Date(),
+        lastLoginAt: new Date().toISOString(),
       });
       isNewUser = true;
     } else {
       // Update lastLoginAt
       await db.update(users)
         .set({ 
-          lastLoginAt: new Date(),
+          lastLoginAt: new Date().toISOString(),
           ...(phone === adminPhone && user.role !== "admin" ? { role: "admin" } : {})
         })
         .where(eq(users.phoneNumber, phone));

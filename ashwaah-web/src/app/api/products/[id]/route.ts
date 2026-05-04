@@ -15,20 +15,23 @@ export async function GET(
       return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
     }
 
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, productId),
-    });
+    const productRows = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
 
-    if (!product) {
+    if (!productRows.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const variations = await db.query.productVariations.findMany({
-      where: eq(productVariations.productId, productId),
-    });
+    const variations = await db
+      .select()
+      .from(productVariations)
+      .where(eq(productVariations.productId, productId));
 
     return NextResponse.json({
-      ...product,
+      ...productRows[0],
       variations,
     });
   } catch (error) {

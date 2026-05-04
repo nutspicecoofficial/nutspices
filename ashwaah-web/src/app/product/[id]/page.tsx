@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { Sparkles, ArrowLeft, ShoppingBag, Check } from "lucide-react";
+import { Sparkles, ArrowLeft, ShoppingBag, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import RefineDrawer from "@/components/RefineDrawer";
@@ -23,6 +23,8 @@ interface Product {
   salePrice: number;
   images: string; // JSON string array
   colors: string; // JSON string array
+  isFeatured: boolean | number | null;
+  isCustomizable: boolean | number | null;
   enabledMeasurements: string | null; // JSON string array
   variations: Variation[];
 }
@@ -38,6 +40,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [measurements, setMeasurements] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const [toast, setToast] = useState("");
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   
   const addItem = useCartStore((state) => state.addItem);
 
@@ -269,7 +272,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 <span className="text-sm font-bold text-brand uppercase tracking-widest flex items-center gap-2">
                   2. Select Size <span className="text-brand/30">—</span> <span className="text-brand-accent">{selectedSize || "None"}</span>
                 </span>
-                <button className="text-[10px] text-brand/40 hover:text-brand-accent font-bold uppercase tracking-widest transition-colors underline underline-offset-4">Size Guide</button>
+                <button 
+                  onClick={() => setIsSizeGuideOpen(true)}
+                  className="text-[10px] text-brand/40 hover:text-brand-accent font-bold uppercase tracking-widest transition-colors underline underline-offset-4"
+                >
+                  Size Guide
+                </button>
               </div>
               <div className="flex flex-wrap gap-3">
                 {availableSizes.map((size) => {
@@ -357,7 +365,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             {/* Add to Cart */}
             <div className="mt-auto pt-6 border-t border-brand/5">
               <button 
-                disabled={selectedColor && selectedSize && currentStock === 0}
+                disabled={!!(selectedColor && selectedSize && currentStock === 0)}
                 onClick={handleAddToCart}
                 className={`w-full flex items-center justify-center space-x-3 font-bold py-4 rounded-2xl transition-all text-base shadow-xl ${
                   selectedColor && selectedSize && currentStock === 0
@@ -394,6 +402,78 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           onClose={() => setDrawerOpen(false)} 
           baseSize={selectedSize || "M"}
         />
+      )}
+
+      {/* Size Guide Modal */}
+      {isSizeGuideOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-brand/60 backdrop-blur-md" onClick={() => setIsSizeGuideOpen(false)} />
+          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
+            <div className="p-8 border-b border-brand/5 flex items-center justify-between bg-brand/5">
+              <h2 className="text-2xl font-serif font-bold text-brand">Size Guide</h2>
+              <button 
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="p-2 hover:bg-brand/10 rounded-full transition-all"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="flex justify-center mb-8 bg-brand/5 p-2 rounded-2xl">
+                <button 
+                  className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${product.gender === 'men' ? 'bg-brand text-white shadow-lg' : 'text-brand/40 hover:text-brand'}`}
+                  onClick={() => setProduct(p => p ? {...p, gender: 'men'} : null)}
+                >
+                  Men's Guide
+                </button>
+                <button 
+                  className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${product.gender === 'women' ? 'bg-brand text-white shadow-lg' : 'text-brand/40 hover:text-brand'}`}
+                  onClick={() => setProduct(p => p ? {...p, gender: 'women'} : null)}
+                >
+                  Women's Guide
+                </button>
+              </div>
+
+              <div className="relative aspect-[3/4] w-full rounded-2xl overflow-hidden border border-brand/5 bg-white">
+                <img 
+                  src={product.gender === 'men' ? "/images/guides/male.jpg" : "/images/guides/female.jpg"} 
+                  alt={`${product.gender} Size Guide`}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://placehold.co/600x800/f5f0e8/1b3022?text=Size+Guide+Image+Not+Found";
+                  }}
+                />
+              </div>
+              
+              <div className="mt-8 space-y-4">
+                <h4 className="text-xs font-black text-brand uppercase tracking-widest">How to Measure?</h4>
+                <p className="text-xs text-brand/60 leading-relaxed">
+                  For the most accurate fit, we recommend having someone else measure you. Hold the tape measure snug, but not tight, against your body.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-brand/5 rounded-2xl">
+                    <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-1">Bust / Chest</p>
+                    <p className="text-[10px] text-brand/40">Measure around the fullest part of your chest.</p>
+                  </div>
+                  <div className="p-4 bg-brand/5 rounded-2xl">
+                    <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-1">Waist</p>
+                    <p className="text-[10px] text-brand/40">Measure around your natural waistline.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-brand/5 border-t border-brand/5 flex justify-center">
+              <button 
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="bg-brand text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-brand-hover transition-all shadow-xl"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
