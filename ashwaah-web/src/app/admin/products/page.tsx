@@ -128,7 +128,7 @@ export default function ProductManagement() {
     setVariations(prev => prev.map(v => v.size === size && v.color === color ? { ...v, [field]: value } : v));
 
   const addImage = () => {
-    if (imageInput.trim() && images.length < 10) { setImages(p => [...p, imageInput.trim()]); setImageInput(""); }
+    if (imageInput.trim()) { setImages(p => [...p, imageInput.trim()]); setImageInput(""); }
   };
 
   const resetForm = () => {
@@ -578,7 +578,7 @@ export default function ProductManagement() {
 
             {/* ── Section 3: Images ── */}
             <div>
-              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">3</span> Product Images ({images.length}/10)</h3>
+              <h3 className="text-xs font-black text-brand/30 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-brand text-white text-[8px] flex items-center justify-center font-black">3</span> Product Images ({images.length})</h3>
               <div className="flex gap-3 mb-5">
                 <input value={imageInput} onChange={e => setImageInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addImage())} placeholder="Paste image URL and press Enter or click Add →" className={`${INPUT} flex-1`} />
                 <button type="button" onClick={addImage} className="bg-[#1B3022] text-[#C5A059] px-5 py-2 rounded-2xl font-bold text-xs hover:bg-[#2c4d37] transition-all whitespace-nowrap">Add URL</button>

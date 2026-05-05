@@ -87,7 +87,6 @@ export default function Home() {
             <ul className="space-y-4 text-sm">
               <li><Link href="/category/mens" className="hover:text-[#C5A059] transition-colors">Men's Bespoke</Link></li>
               <li><Link href="/category/womens" className="hover:text-[#C5A059] transition-colors">Women's Couture</Link></li>
-              <li><Link href="/category/accessories" className="hover:text-[#C5A059] transition-colors">Luxury Accessories</Link></li>
             </ul>
           </div>
           <div>
