@@ -178,13 +178,7 @@ export default async function Home() {
               Bringing you nature's finest treasures. From premium Californian almonds to handcrafted spice blends, we ensure every bite is a journey of quality and taste.
             </p>
           </div>
-          <div>
-            <h4 className="text-white font-bold uppercase tracking-[0.2em] text-xs mb-6">Explore</h4>
-            <ul className="space-y-4 text-sm">
-              <li><Link href="/category/almonds" className="hover:text-[#C5A059] transition-colors">Premium Nuts</Link></li>
-              <li><Link href="/category/spices" className="hover:text-[#C5A059] transition-colors">Exotic Spices</Link></li>
-            </ul>
-          </div>
+
 
           <div>
             <h4 className="text-white font-bold uppercase tracking-[0.2em] text-xs mb-6">Company</h4>

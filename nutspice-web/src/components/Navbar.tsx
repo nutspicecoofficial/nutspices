@@ -212,7 +212,7 @@ export default function Navbar() {
                     <div className="absolute top-full left-0 w-full h-4 bg-transparent z-[45]" />
 
                     <div
-                      className={`absolute top-full left-0 mt-2 bg-white border border-brand/5 rounded-xl shadow-2xl py-4 animate-in fade-in slide-in-from-top-2 duration-200 z-50 ${collections.length > 10 ? "w-[480px] grid grid-cols-2 gap-x-2" : "w-56 flex flex-col"
+                      className={`absolute top-full left-0 mt-2 bg-white border border-brand/5 rounded-2xl shadow-2xl py-4 animate-in fade-in slide-in-from-top-2 duration-200 z-50 ${collections.length > 10 ? "w-[540px] grid grid-cols-2 gap-x-2" : "w-64 flex flex-col"
                         }`}
                       onMouseEnter={() => setIsCollectionsOpen(true)}
                     >
@@ -220,7 +220,7 @@ export default function Navbar() {
                         <Link
                           key={i}
                           href={`/category/${item.slug}`}
-                          className="block px-6 py-2.5 text-[10px] font-bold tracking-wider text-brand hover:text-[#C5A059] hover:bg-brand/5 transition-all truncate"
+                          className="block px-6 py-3 text-[13px] font-bold tracking-wide text-brand hover:text-[#C5A059] hover:bg-brand/5 transition-all truncate"
                           onClick={() => setIsCollectionsOpen(false)}
                         >
                           {item.name}
