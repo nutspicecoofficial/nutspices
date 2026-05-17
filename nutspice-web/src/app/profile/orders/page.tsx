@@ -129,7 +129,7 @@ export default function MyOrdersPage() {
                     <Package size={20} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-black tracking-widest uppercase mb-1">Order #AS-{order.id}</h4>
+                    <h4 className="text-sm font-black tracking-widest uppercase mb-1">Order #NS-{order.id}</h4>
                     <p className="text-xs font-medium text-white/70">NutspiceCo Selection</p>
                   </div>
                 </div>
@@ -167,7 +167,7 @@ export default function MyOrdersPage() {
                     
                     {/* Active Progress Line */}
                     <div 
-                      className="absolute top-1/2 left-0 h-[3px] bg-[#f0a6bc] -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
+                      className="absolute top-1/2 left-0 h-[3px] bg-green-500 -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
                       style={{ 
                         width: `${(Math.max(0, MILESTONES.indexOf(order.status))) / (MILESTONES.length - 1) * 100}%` 
                       }} 
@@ -190,13 +190,13 @@ export default function MyOrdersPage() {
                           <div key={m} className="flex flex-col items-center">
                             <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-500 z-10 ${
                               isCompleted 
-                                ? "bg-[#f8e8ed] border-2 border-[#f0a6bc] text-[#d6336c]" 
+                                ? "bg-green-50 border-2 border-green-500 text-green-600" 
                                 : "bg-white border-2 border-gray-100 text-gray-300"
-                            } ${isCurrent ? "ring-4 ring-[#d6336c]/10" : ""}`}>
+                            } ${isCurrent ? "ring-4 ring-green-500/20" : ""}`}>
                               <Icon size={16} />
                             </div>
                             <span className={`absolute mt-12 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-center whitespace-nowrap transition-colors duration-500 ${
-                              isCompleted ? "text-[#d6336c]" : "text-gray-400"
+                              isCompleted ? "text-green-600" : "text-gray-400"
                             }`}>
                               {m}
                             </span>
