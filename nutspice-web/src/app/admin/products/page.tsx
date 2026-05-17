@@ -270,7 +270,7 @@ export default function ProductManagement() {
                   <thead className="text-[10px] font-black text-brand/30 uppercase tracking-widest">
                     <tr>
                       <th className="pb-4 px-2">Variation</th>
-                      <th className="pb-4 px-2">Current Stock</th>
+                      <th className="pb-4 px-2">Stock Left</th>
                       <th className="pb-4 px-2">New Quantity</th>
                     </tr>
                   </thead>
@@ -470,7 +470,7 @@ export default function ProductManagement() {
                         <th className="px-5 py-4">Weight</th>
                         <th className="px-5 py-4">Base Price (₹)</th>
                         <th className="px-5 py-4">Sale (₹)</th>
-                        <th className="px-5 py-4">Stock</th>
+                        <th className="px-5 py-4">Stock Left</th>
                         <th className="px-5 py-4">SKU</th>
                         <th className="px-5 py-4 text-center">Action</th>
                       </tr>

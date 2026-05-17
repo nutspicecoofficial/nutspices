@@ -26,11 +26,33 @@ export async function GET(request: Request) {
       if (!product.length) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
       
       const variations = await db.select().from(productVariations).where(eq(productVariations.productId, parseInt(id)));
-      // Map mrp to basePrice for the frontend
-      const mappedVariations = variations.map(v => ({
-        ...v,
-        basePrice: v.mrp
-      }));
+      
+      const productOrderItems = await db
+        .select({
+          variationId: orderItems.variationId,
+          size: orderItems.size,
+          quantity: orderItems.quantity,
+          status: orders.status,
+        })
+        .from(orderItems)
+        .leftJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(eq(orderItems.productId, parseInt(id)));
+
+      // Map mrp to basePrice for the frontend and convert stock to Remaining Stock
+      const mappedVariations = variations.map(v => {
+        const vOrders = productOrderItems.filter(item => 
+          item.variationId === v.id || item.size === v.size
+        );
+        const soldOrPending = vOrders
+          .filter(item => item.status && ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
+          .reduce((sum, item) => sum + (item.quantity || 0), 0);
+          
+        return {
+          ...v,
+          basePrice: v.mrp,
+          stock: Math.max(0, v.stock - soldOrPending)
+        };
+      });
       return NextResponse.json({ success: true, data: { ...product[0], variations: mappedVariations } });
     }
     
@@ -185,6 +207,18 @@ export async function PATCH(request: Request) {
     if (tags !== undefined) updateData.tags = tags;
     if (isFeatured !== undefined) updateData.isFeatured = !!isFeatured;
 
+    // Fetch order history to convert Remaining Stock input back to Initial Stock for DB
+    const productOrderItems = await db
+      .select({
+        variationId: orderItems.variationId,
+        size: orderItems.size,
+        quantity: orderItems.quantity,
+        status: orders.status,
+      })
+      .from(orderItems)
+      .leftJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(eq(orderItems.productId, id));
+
     // 1 & 2. Update Product and Variations in a Transaction
     await db.transaction(async (tx) => {
       if (Object.keys(updateData).length > 0) {
@@ -194,14 +228,24 @@ export async function PATCH(request: Request) {
       if (variations) {
         await tx.delete(productVariations).where(eq(productVariations.productId, id));
         if (variations.length > 0) {
-          const variationValues = variations.map((v: any) => ({
-            productId: id,
-            size: v.size,
-            stock: parseInt(v.stock) || 0,
-            mrp: Number(v.basePrice) || 0,
-            salePrice: Number(v.salePrice) || 0,
-            sku: v.sku || `${id}-${v.size}`
-          }));
+          const variationValues = variations.map((v: any) => {
+            const vOrders = productOrderItems.filter(item => item.size === v.size);
+            const soldOrPending = vOrders
+              .filter(item => item.status && ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
+              .reduce((sum, item) => sum + (item.quantity || 0), 0);
+            
+            const inputRemaining = parseInt(v.stock) || 0;
+            const actualDbStock = inputRemaining + soldOrPending;
+
+            return {
+              productId: id,
+              size: v.size,
+              stock: actualDbStock,
+              mrp: Number(v.basePrice) || 0,
+              salePrice: Number(v.salePrice) || 0,
+              sku: v.sku || `${id}-${v.size}`
+            };
+          });
           await tx.insert(productVariations).values(variationValues);
         }
       }
