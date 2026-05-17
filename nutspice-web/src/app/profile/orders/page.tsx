@@ -23,6 +23,8 @@ interface Order {
   status: string;
   shippingAddress: string | null;
   createdAt: string;
+  paymentId?: string | null;
+  customerPhone?: string | null;
   items: OrderItem[];
 }
 
@@ -195,109 +197,135 @@ export default function MyOrdersPage() {
                 </div>
               )}
 
-              <div className="p-6 md:px-8 md:py-8 space-y-8 bg-white">
-                {order.items.map((item, idx) => (
-                  <div key={item.id} className="flex flex-col sm:flex-row gap-6 items-start pb-8 border-b border-gray-100 last:border-0 last:pb-0">
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 bg-[#F9F6EE] rounded-2xl overflow-hidden flex-shrink-0 relative group/img">
-                      {item.productImage ? (
-                        <img 
-                          src={item.productImage} 
-                          alt={item.productName} 
-                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = ""; // Clear src to show fallback
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <ImageIcon size={24} />
+              <div className="p-6 md:px-8 md:py-8 bg-white">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column: Items */}
+                  <div>
+                    <h4 className="text-[10px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Items Purchased</h4>
+                    <div className="space-y-4">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="flex flex-col sm:flex-row gap-4 items-start p-4 bg-gray-50/50 rounded-2xl border border-brand/5 shadow-sm">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F9F6EE] rounded-xl overflow-hidden flex-shrink-0 relative group/img">
+                            {item.productImage ? (
+                              <img 
+                                src={item.productImage} 
+                                alt={item.productName} 
+                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                <ImageIcon size={20} />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 flex items-center justify-center text-gray-200 -z-10 bg-gray-50">
+                              <ImageIcon size={20} />
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0 w-full flex flex-col justify-between h-full">
+                            <div>
+                              <h5 className="text-[14px] font-bold text-gray-900 leading-snug">{item.productName}</h5>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">
+                                Qty: {item.quantity} • {item.size}
+                              </p>
+                            </div>
+                            <div className="text-left mt-2">
+                              <span className="text-sm font-black text-brand tracking-widest">₹{(item.price * item.quantity).toLocaleString()}</span>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      {/* Fallback for broken images */}
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-200 -z-10 bg-gray-50">
-                        <ImageIcon size={24} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Address and Actions */}
+                  <div className="flex flex-col justify-between h-full">
+                    <div>
+                      <h4 className="text-[10px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Delivery Details</h4>
+                      
+                      {/* Address Card */}
+                      <div className="flex gap-3 p-5 bg-white rounded-2xl border border-brand/5 shadow-sm mb-4">
+                        <MapPin size={18} className="text-[#C5A059] flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-brand font-medium leading-relaxed italic">
+                            "{order.shippingAddress || "No address provided"}"
+                          </p>
+                          <div className="mt-4 pt-4 border-t border-brand/5 grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[9px] font-black text-brand/30 uppercase tracking-widest mb-1">Customer Phone</p>
+                              <p className="text-xs text-brand font-bold">{order.customerPhone || "N/A"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black text-brand/30 uppercase tracking-widest mb-1">Mode of Payment</p>
+                              <p className="text-xs text-brand font-bold">{order.paymentId ? "Online Payment" : "Prepaid"}</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0 w-full">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 gap-2">
-                        <h5 className="text-[16px] font-bold text-gray-900 leading-snug pr-4">{item.productName}</h5>
-                        
-                        {/* Inline Cancel Confirmation */}
-                        {idx === 0 && ["pending"].includes(order.status) && (
-                          <div className="flex items-center space-x-2">
-                            {confirmingCancelId === order.id ? (
-                              <div className="flex items-center space-x-2 animate-in fade-in slide-in-from-right-2 duration-300">
-                                <span className="text-[8px] font-black uppercase tracking-widest text-red-500 bg-red-50 px-2 py-1 rounded-md">Confirm?</span>
+
+                    {/* Actions & Notes */}
+                    <div className="mt-4">
+                      {["pending", "confirmed", "processing"].includes(order.status.toLowerCase()) && (
+                        <div className="space-y-4">
+                          {confirmingCancelId === order.id ? (
+                            <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                              <span className="text-xs font-bold text-red-600">Are you sure you want to cancel?</span>
+                              <div className="flex gap-2 w-full sm:w-auto">
                                 <button 
                                   disabled={isCancelling}
                                   onClick={() => handleCancelOrder(order.id)}
-                                  className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-sm flex items-center justify-center"
-                                  title="Confirm Cancel"
+                                  className="flex-1 sm:flex-none px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-[10px] tracking-widest uppercase hover:bg-red-700 transition-all flex justify-center"
                                 >
-                                  {isCancelling ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                  {isCancelling ? <Loader2 size={14} className="animate-spin" /> : "Yes, Cancel"}
                                 </button>
                                 <button 
                                   disabled={isCancelling}
                                   onClick={() => setConfirmingCancelId(null)}
-                                  className="p-1.5 bg-brand/5 text-brand/40 rounded-lg hover:bg-brand/10 transition-all"
-                                  title="Keep Order"
+                                  className="flex-1 sm:flex-none px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-xl font-bold text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all"
                                 >
-                                  <X size={12} />
+                                  No
                                 </button>
                               </div>
-                            ) : (
-                              <button 
-                                onClick={() => setConfirmingCancelId(order.id)}
-                                className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-all group/cancel"
-                              >
-                                <XCircle size={14} className="group-hover/cancel:rotate-90 transition-transform duration-300" />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center space-x-3 mb-4 mt-2">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest bg-gray-50 px-2.5 py-1 rounded-md">Weight: {item.size}</span>
-                        <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest bg-gray-50 px-2.5 py-1 rounded-md">Qty: {item.quantity}</span>
-                      </div>
-                      
-                      {/* Shipping Address Moved Here */}
-                      {idx === 0 && (
-                        <div className="mt-4 bg-gray-50/50 rounded-2xl p-4 w-full sm:w-3/4 flex gap-3 items-start border border-gray-100">
-                          <MapPin size={16} className="text-brand flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-gray-400">Delivery Address</p>
-                            <p className="text-[12px] font-medium text-gray-700 leading-relaxed">
-                              {order.shippingAddress || "No address provided"}
-                            </p>
-                          </div>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setConfirmingCancelId(order.id)}
+                              className="w-full py-3.5 bg-white border-2 border-red-100 text-red-500 rounded-xl font-bold text-xs transition-all shadow-sm uppercase tracking-widest hover:bg-red-50 flex items-center justify-center gap-2"
+                            >
+                              <XCircle size={16} />
+                              Cancel Order
+                            </button>
+                          )}
                         </div>
                       )}
-                    </div>
-                      <div className="text-left sm:text-right self-start sm:self-center min-w-[80px]">
-                        <span className="text-lg font-black text-brand tracking-widest">₹{item.price.toLocaleString()}</span>
+                      
+                      <div className="mt-4 p-4 bg-brand/5 rounded-xl border border-brand/5">
+                        <p className="text-[10px] font-bold text-brand/60 leading-relaxed">
+                          <span className="text-brand font-black uppercase tracking-widest">NOTE: </span> 
+                          Once shipping started you can't cancel the order.
+                        </p>
                       </div>
                     </div>
-                  ))}
-
-
-
-                  {/* Status Messages */}
-                  {order.status === "cancelled" && (
-                    <div className="pt-6 border-t border-brand/5">
-                      <div className="flex items-center space-x-3 px-6 py-4 rounded-2xl bg-red-50 border border-red-100 text-red-600">
-                        <AlertTriangle size={18} />
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest">Order Cancelled</p>
-                          <p className="text-[9px] font-medium opacity-70">A refund will be initiated if payment was captured. Amount will be credited within 7 to 9 business days.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
+
+                {/* Cancelled Status Message */}
+                {order.status === "cancelled" && (
+                  <div className="mt-8 pt-6 border-t border-brand/5">
+                    <div className="flex items-start sm:items-center space-x-4 px-6 py-5 rounded-2xl bg-red-50 border border-red-100 text-red-600 shadow-sm">
+                      <AlertTriangle size={20} className="flex-shrink-0 mt-0.5 sm:mt-0" />
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest mb-1">Order Cancelled</p>
+                        <p className="text-[10px] font-medium opacity-80 leading-relaxed">A refund will be initiated if payment was captured. Amount will be credited within 7 to 9 business days.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               </div>
           ))}
         </div>

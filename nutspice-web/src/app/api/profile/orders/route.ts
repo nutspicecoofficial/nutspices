@@ -26,6 +26,8 @@ export async function GET() {
       status: orders.status,
       shippingAddress: orders.shippingAddress,
       createdAt: orders.createdAt,
+      paymentId: orders.paymentId,
+      customerPhone: user.phoneNumber,
     })
     .from(orders)
     .where(eq(orders.userId, user.id))
