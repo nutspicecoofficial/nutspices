@@ -16,7 +16,8 @@ import {
   CheckSquare,
   XCircle,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Truck
 } from "lucide-react";
 
 type OrderItem = {
@@ -47,6 +48,8 @@ export default function AdminOrders() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<{ [key: number]: string }>({});
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -69,6 +72,28 @@ export default function AdminOrders() {
     }
     fetchOrders();
   }, []);
+
+  const handleUpdateStatus = async (orderId: number) => {
+    const newStatus = selectedStatus[orderId];
+    if (!newStatus || newStatus === orders.find(o => o.id === orderId)?.status) return;
+    
+    setUpdatingStatusId(orderId);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
 
   const getStatusCount = (status: string) => {
     return orders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
@@ -103,11 +128,11 @@ export default function AdminOrders() {
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const statusCards = [
-    { label: "PENDING", count: getStatusCount("pending"), icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
-    { label: "CONFIRMED", count: getStatusCount("confirmed"), icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "PROCESSING", count: getStatusCount("processing"), icon: Box, color: "text-indigo-500", bg: "bg-indigo-50" },
-    { label: "COMPLETED", count: getStatusCount("delivered") + getStatusCount("completed"), icon: CheckSquare, color: "text-emerald-500", bg: "bg-emerald-50" },
-    { label: "CANCELLED", count: getStatusCount("cancelled"), icon: XCircle, color: "text-rose-500", bg: "bg-rose-50" },
+    { label: "PLACED", count: getStatusCount("Order Placed") + getStatusCount("pending"), icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
+    { label: "PROCESSING", count: getStatusCount("Processing"), icon: Box, color: "text-indigo-500", bg: "bg-indigo-50" },
+    { label: "SHIPPED", count: getStatusCount("Shipped") + getStatusCount("In Transit") + getStatusCount("Out for Delivery"), icon: Truck, color: "text-blue-500", bg: "bg-blue-50" },
+    { label: "DELIVERED", count: getStatusCount("Delivered"), icon: CheckSquare, color: "text-emerald-500", bg: "bg-emerald-50" },
+    { label: "CANCELLED", count: getStatusCount("Cancelled"), icon: XCircle, color: "text-rose-500", bg: "bg-rose-50" },
   ];
 
   if (loading) {
@@ -274,11 +299,25 @@ export default function AdminOrders() {
                       </div>
 
                       <div className="flex gap-2 mt-6">
-                        <button className="flex-1 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest">
-                          Update Status
-                        </button>
-                        <button className="px-4 py-3 border border-brand/10 hover:bg-brand/5 text-brand rounded-xl font-bold text-[10px] transition-all uppercase tracking-widest">
-                          Invoice
+                        <select
+                          className="flex-1 py-3 px-3 bg-white border border-brand/10 text-brand rounded-xl font-bold text-xs shadow-sm focus:outline-none focus:border-[#C5A059] transition-all"
+                          value={selectedStatus[order.id] || order.status}
+                          onChange={(e) => setSelectedStatus({ ...selectedStatus, [order.id]: e.target.value })}
+                        >
+                          <option value="Order Placed">Order Placed</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="In Transit">In Transit</option>
+                          <option value="Out for Delivery">Out for Delivery</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                        <button 
+                          onClick={() => handleUpdateStatus(order.id)}
+                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] && selectedStatus[order.id] === order.status)}
+                          className="px-6 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest disabled:opacity-50 flex items-center justify-center min-w-[120px]"
+                        >
+                          {updatingStatusId === order.id ? <Loader2 size={14} className="animate-spin" /> : "Update Status"}
                         </button>
                       </div>
                     </div>

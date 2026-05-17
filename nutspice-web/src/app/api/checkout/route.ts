@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     const [newOrder] = await db.insert(orders).values({
       userId: user.id,
       totalAmount: totalAmount,
-      status: "processing", // Status after successful payment
+      status: "Order Placed", // Status after successful payment
       shippingAddress: shippingAddress,
       paymentId: razorpay_payment_id,
       razorpayOrderId: razorpay_order_id,

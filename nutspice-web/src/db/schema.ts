@@ -74,7 +74,7 @@ export const orders = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").references(() => users.id),
   totalAmount: real("total_amount").notNull(),
-  status: text("status").default("pending"), // pending, processing, shipped, delivered, cancelled
+  status: text("status").default("Order Placed"), // Order Placed, Processing, Shipped, In Transit, Out for Delivery, Delivered, Cancelled
   shippingAddress: text("shipping_address"),
   paymentId: text("payment_id"),
   razorpayOrderId: text("razorpay_order_id"),

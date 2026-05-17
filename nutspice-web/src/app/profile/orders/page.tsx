@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, XCircle, AlertTriangle, Image as ImageIcon, MapPin, Check, X } from "lucide-react";
+import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, XCircle, AlertTriangle, Image as ImageIcon, MapPin, Check, X, Truck, Plane, Bike, CheckSquare, Cog } from "lucide-react";
 import Link from "next/link";
 
 interface OrderItem {
@@ -29,11 +29,12 @@ interface Order {
 }
 
 const MILESTONES = [
-  "confirmed",
-  "shipped",
-  "on the way",
-  "out for delivery",
-  "delivered"
+  "Order Placed",
+  "Processing",
+  "Shipped",
+  "In Transit",
+  "Out for Delivery",
+  "Delivered"
 ];
 
 export default function MyOrdersPage() {
@@ -166,9 +167,9 @@ export default function MyOrdersPage() {
                     
                     {/* Active Progress Line */}
                     <div 
-                      className="absolute top-1/2 left-0 h-[3px] bg-brand -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
+                      className="absolute top-1/2 left-0 h-[3px] bg-[#f0a6bc] -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
                       style={{ 
-                        width: `${(MILESTONES.indexOf(order.status) / (MILESTONES.length - 1)) * 100}%` 
+                        width: `${(Math.max(0, MILESTONES.indexOf(order.status))) / (MILESTONES.length - 1) * 100}%` 
                       }} 
                     />
 
@@ -177,15 +178,25 @@ export default function MyOrdersPage() {
                       {MILESTONES.map((m, idx) => {
                         const isCompleted = MILESTONES.indexOf(order.status) >= idx;
                         const isCurrent = order.status === m;
+                        
+                        let Icon = Package;
+                        if (m === "Processing") Icon = Cog;
+                        if (m === "Shipped") Icon = Truck;
+                        if (m === "In Transit") Icon = Plane;
+                        if (m === "Out for Delivery") Icon = Bike;
+                        if (m === "Delivered") Icon = CheckSquare;
+
                         return (
                           <div key={m} className="flex flex-col items-center">
-                            <div className={`w-3.5 h-3.5 rounded-full border-[3px] transition-all duration-500 ${
+                            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-500 z-10 ${
                               isCompleted 
-                                ? "bg-white border-brand scale-125" 
-                                : "bg-white border-gray-200"
-                            } ${isCurrent ? "ring-4 ring-brand/10" : ""}`} />
-                            <span className={`absolute mt-6 text-[9px] font-bold uppercase tracking-[0.15em] text-center whitespace-nowrap transition-colors duration-500 ${
-                              isCompleted ? "text-gray-900" : "text-gray-400"
+                                ? "bg-[#f8e8ed] border-2 border-[#f0a6bc] text-[#d6336c]" 
+                                : "bg-white border-2 border-gray-100 text-gray-300"
+                            } ${isCurrent ? "ring-4 ring-[#d6336c]/10" : ""}`}>
+                              <Icon size={16} />
+                            </div>
+                            <span className={`absolute mt-12 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-center whitespace-nowrap transition-colors duration-500 ${
+                              isCompleted ? "text-[#d6336c]" : "text-gray-400"
                             }`}>
                               {m}
                             </span>
@@ -269,7 +280,7 @@ export default function MyOrdersPage() {
 
                     {/* Actions & Notes */}
                     <div className="mt-4">
-                      {["pending", "confirmed", "processing"].includes(order.status.toLowerCase()) && (
+                      {["Order Placed", "Processing"].includes(order.status) && (
                         <div className="space-y-4">
                           {confirmingCancelId === order.id ? (
                             <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -306,7 +317,7 @@ export default function MyOrdersPage() {
                       <div className="mt-4 p-4 bg-brand/5 rounded-xl border border-brand/5">
                         <p className="text-[10px] font-bold text-brand/60 leading-relaxed">
                           <span className="text-brand font-black uppercase tracking-widest">NOTE: </span> 
-                          Once shipping started you can't cancel the order.
+                          Once shipping started you can't cancel the order. NO COD and No Return.
                         </p>
                       </div>
                     </div>
