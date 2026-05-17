@@ -344,21 +344,30 @@ export default function AdminOrders() {
 
                       <div className="flex gap-2 mt-6">
                         <select
-                          className="flex-1 py-3 px-3 bg-white border border-brand/10 text-brand rounded-xl font-bold text-xs shadow-sm focus:outline-none focus:border-[#C5A059] transition-all"
+                          className="flex-1 py-3 px-3 bg-white border border-brand/10 text-brand rounded-xl font-bold text-xs shadow-sm focus:outline-none focus:border-[#C5A059] transition-all disabled:opacity-50 disabled:bg-gray-50"
                           value={selectedStatus[order.id] || getNormalizedStatus(order.status)}
                           onChange={(e) => setSelectedStatus({ ...selectedStatus, [order.id]: e.target.value })}
+                          disabled={getNormalizedStatus(order.status) === "Cancelled" || getNormalizedStatus(order.status) === "Delivered"}
                         >
-                          <option value="Order Placed">Order Placed</option>
-                          <option value="Processing">Processing</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="In Transit">In Transit</option>
-                          <option value="Out for Delivery">Out for Delivery</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
+                          {(() => {
+                            const STATUS_ORDER = ["Order Placed", "Processing", "Shipped", "In Transit", "Out for Delivery", "Delivered"];
+                            const currentIdx = STATUS_ORDER.indexOf(getNormalizedStatus(order.status));
+                            
+                            return (
+                              <>
+                                {STATUS_ORDER.map((status, idx) => (
+                                  <option key={status} value={status} disabled={currentIdx !== -1 && idx < currentIdx}>
+                                    {status}
+                                  </option>
+                                ))}
+                                <option value="Cancelled">Cancelled</option>
+                              </>
+                            );
+                          })()}
                         </select>
                         <button 
                           onClick={() => handleUpdateStatus(order.id)}
-                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] || getNormalizedStatus(order.status)) === getNormalizedStatus(order.status)}
+                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] || getNormalizedStatus(order.status)) === getNormalizedStatus(order.status) || getNormalizedStatus(order.status) === "Cancelled" || getNormalizedStatus(order.status) === "Delivered"}
                           className="px-6 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest disabled:opacity-50 flex items-center justify-center min-w-[120px]"
                         >
                           {updatingStatusId === order.id ? <Loader2 size={14} className="animate-spin" /> : "Update Status"}
