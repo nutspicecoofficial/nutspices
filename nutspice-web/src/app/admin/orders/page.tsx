@@ -44,6 +44,14 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, startDate, endDate]);
 
   useEffect(() => {
     async function fetchOrders() {
@@ -66,11 +74,33 @@ export default function AdminOrders() {
     return orders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
   };
 
-  const filteredOrders = orders.filter(order => 
-    order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.id.toString().includes(searchTerm) ||
-    order.status.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.id.toString().includes(searchTerm) ||
+      order.status.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const orderDate = new Date(order.createdAt);
+      orderDate.setHours(0, 0, 0, 0);
+
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (orderDate < start) matchesDate = false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
+        if (orderDate > end) matchesDate = false;
+      }
+    }
+
+    return matchesSearch && matchesDate;
+  });
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const statusCards = [
     { label: "PENDING", count: getStatusCount("pending"), icon: Clock, color: "text-amber-500", bg: "bg-amber-50" },
@@ -99,15 +129,33 @@ export default function AdminOrders() {
           </p>
         </div>
         
-        <div className="relative w-full md:w-[360px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by order # or mobile..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]/10 focus:border-[#C5A059] transition-all text-brand text-sm font-medium placeholder:text-brand/20"
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <input 
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="flex-1 px-3 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:border-[#C5A059] transition-all text-brand text-xs font-medium cursor-pointer"
+              title="Start Date"
+            />
+            <input 
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="flex-1 px-3 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:border-[#C5A059] transition-all text-brand text-xs font-medium cursor-pointer"
+              title="End Date"
+            />
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search order # or mobile..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]/10 focus:border-[#C5A059] transition-all text-brand text-sm font-medium placeholder:text-brand/20"
+            />
+          </div>
         </div>
       </div>
 
@@ -134,13 +182,13 @@ export default function AdminOrders() {
 
       {/* Orders List */}
       <div className="space-y-3">
-        {filteredOrders.length === 0 ? (
+        {paginatedOrders.length === 0 ? (
           <div className="bg-white rounded-2xl p-16 text-center border border-brand/5 shadow-sm">
             <h2 className="text-xl font-playfair font-bold text-brand mb-2">No results found</h2>
-            <p className="text-brand/40 text-sm font-medium">Try searching with a different term.</p>
+            <p className="text-brand/40 text-sm font-medium">Try searching with a different term or date range.</p>
           </div>
         ) : (
-          filteredOrders.map((order) => (
+          paginatedOrders.map((order) => (
             <div key={order.id} className="bg-white rounded-2xl border border-brand/5 shadow-sm overflow-hidden hover:shadow-md transition-all">
               <div 
                 className="p-4 flex items-center justify-between cursor-pointer group"
@@ -158,7 +206,14 @@ export default function AdminOrders() {
                       </span>
                     </div>
                     <p className="text-xs font-medium text-brand/40">
-                      Placed on {new Date(order.createdAt).toLocaleDateString('en-GB')}
+                      Placed on {new Date(order.createdAt).toLocaleString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
                     </p>
                   </div>
                 </div>
@@ -234,6 +289,29 @@ export default function AdminOrders() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6 bg-white p-4 rounded-2xl border border-brand/5 shadow-sm">
+          <button 
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 text-xs font-bold text-brand uppercase tracking-widest hover:bg-brand/5 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+          >
+            Previous
+          </button>
+          <div className="text-xs font-black text-brand/50 uppercase tracking-widest">
+            Page {currentPage} of {totalPages}
+          </div>
+          <button 
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 text-xs font-bold text-brand uppercase tracking-widest hover:bg-brand/5 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }
