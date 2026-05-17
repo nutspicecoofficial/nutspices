@@ -40,7 +40,7 @@ export async function GET() {
         const vToDeliver = variationOrderItems
           .filter(item => 
             item.status && 
-            ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery"].includes(item.status.toLowerCase())
+            ["order placed", "processing", "shipped", "in transit", "out for delivery"].includes(item.status.toLowerCase())
           )
           .reduce((sum, item) => sum + (item.quantity || 0), 0);
 

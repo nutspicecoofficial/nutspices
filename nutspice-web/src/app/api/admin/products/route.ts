@@ -44,7 +44,7 @@ export async function GET(request: Request) {
           item.variationId === v.id || item.size === v.size
         );
         const soldOrPending = vOrders
-          .filter(item => item.status && ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
+          .filter(item => item.status && ["order placed", "processing", "shipped", "in transit", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
           .reduce((sum, item) => sum + (item.quantity || 0), 0);
           
         return {
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
       const toDeliver = productOrderItems
         .filter(item => 
           item.status && 
-          ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery"].includes(item.status.toLowerCase())
+          ["order placed", "processing", "shipped", "in transit", "out for delivery"].includes(item.status.toLowerCase())
         )
         .reduce((sum, item) => sum + (item.quantity || 0), 0);
 
@@ -231,7 +231,7 @@ export async function PATCH(request: Request) {
           const variationValues = variations.map((v: any) => {
             const vOrders = productOrderItems.filter(item => item.size === v.size);
             const soldOrPending = vOrders
-              .filter(item => item.status && ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
+              .filter(item => item.status && ["order placed", "processing", "shipped", "in transit", "out for delivery", "delivered"].includes(item.status.toLowerCase()))
               .reduce((sum, item) => sum + (item.quantity || 0), 0);
             
             const inputRemaining = parseInt(v.stock) || 0;
@@ -286,7 +286,7 @@ export async function DELETE(request: Request) {
       .all();
 
     // 2. Block deletion only if there are ACTIVE (non-completed) orders
-    const activeStatuses = ["pending", "confirmed", "processing", "shipped", "on the way", "out for delivery"];
+    const activeStatuses = ["order placed", "processing", "shipped", "in transit", "out for delivery"];
     const hasActiveOrders = relatedOrderItems.some(
       (item) => item.status && activeStatuses.includes(item.status.toLowerCase())
     );
