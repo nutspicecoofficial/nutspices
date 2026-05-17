@@ -103,13 +103,25 @@ export default function AdminOrders() {
   const getStatusBadgeStyle = (status: string) => {
     const s = status.toLowerCase();
     if (s === "order placed" || s === "pending") return "bg-amber-50 border-amber-200 text-amber-600";
-    if (s === "processing") return "bg-indigo-50 border-indigo-200 text-indigo-600";
+    if (s === "processing" || s === "confirmed") return "bg-indigo-50 border-indigo-200 text-indigo-600";
     if (s === "shipped") return "bg-blue-50 border-blue-200 text-blue-600";
-    if (s === "in transit") return "bg-purple-50 border-purple-200 text-purple-600";
+    if (s === "in transit" || s === "on the way") return "bg-purple-50 border-purple-200 text-purple-600";
     if (s === "out for delivery") return "bg-pink-50 border-pink-200 text-pink-600";
     if (s === "delivered" || s === "completed") return "bg-emerald-50 border-emerald-200 text-emerald-600";
     if (s === "cancelled") return "bg-rose-50 border-rose-200 text-rose-600";
     return "bg-brand/5 border-brand/10 text-brand/60";
+  };
+
+  const getNormalizedStatus = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "order placed" || s === "pending") return "Order Placed";
+    if (s === "processing" || s === "confirmed") return "Processing";
+    if (s === "shipped") return "Shipped";
+    if (s === "in transit" || s === "on the way") return "In Transit";
+    if (s === "out for delivery") return "Out for Delivery";
+    if (s === "delivered" || s === "completed") return "Delivered";
+    if (s === "cancelled") return "Cancelled";
+    return status;
   };
 
   const filteredOrders = orders.filter(order => {
@@ -117,7 +129,7 @@ export default function AdminOrders() {
       order.id.toString().includes(searchTerm) ||
       order.status.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatusFilter = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesStatusFilter = statusFilter === "all" || getNormalizedStatus(order.status).toLowerCase() === statusFilter.toLowerCase();
     
     let matchesDate = true;
     if (startDate || endDate) {
@@ -333,7 +345,7 @@ export default function AdminOrders() {
                       <div className="flex gap-2 mt-6">
                         <select
                           className="flex-1 py-3 px-3 bg-white border border-brand/10 text-brand rounded-xl font-bold text-xs shadow-sm focus:outline-none focus:border-[#C5A059] transition-all"
-                          value={selectedStatus[order.id] || order.status}
+                          value={selectedStatus[order.id] || getNormalizedStatus(order.status)}
                           onChange={(e) => setSelectedStatus({ ...selectedStatus, [order.id]: e.target.value })}
                         >
                           <option value="Order Placed">Order Placed</option>
@@ -346,7 +358,7 @@ export default function AdminOrders() {
                         </select>
                         <button 
                           onClick={() => handleUpdateStatus(order.id)}
-                          disabled={updatingStatusId === order.id || selectedStatus[order.id] === order.status}
+                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] || getNormalizedStatus(order.status)) === getNormalizedStatus(order.status)}
                           className="px-6 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest disabled:opacity-50 flex items-center justify-center min-w-[120px]"
                         >
                           {updatingStatusId === order.id ? <Loader2 size={14} className="animate-spin" /> : "Update Status"}
