@@ -1,0 +1,159 @@
+import { db } from "@/db";
+import { navigationMenu, pageSections, products } from "@/db/schema";
+import { eq, inArray, asc, sql } from "drizzle-orm";
+import ProductGrid from "@/components/ProductGrid";
+import { ShoppingBag } from "lucide-react";
+import Link from "next/link";
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export default async function CategoryPage({ params }: PageProps) {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug).replace(/-/g, " ");
+  
+  // 1. Try to find the menu item by href
+  const href = `/category/${slug}`;
+  const menuResult = await db.select()
+    .from(navigationMenu)
+    .where(eq(navigationMenu.href, href))
+    .limit(1);
+
+  const menuItem = menuResult[0];
+  let sectionsWithProducts: any[] = [];
+  let categoryName = decodedSlug.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+  if (menuItem) {
+    categoryName = menuItem.label;
+    // 2. Fetch sections for this menu item
+    const sections = await db.select()
+      .from(pageSections)
+      .where(eq(pageSections.menuId, menuItem.id))
+      .orderBy(asc(pageSections.displayOrder));
+
+    // Hydrate products for each section
+    sectionsWithProducts = await Promise.all(
+      sections.map(async (section) => {
+        const productIds = section.productIds
+          .split(",")
+          .map(id => parseInt(id.trim()))
+          .filter(id => !isNaN(id));
+
+        let hydratedProducts: any[] = [];
+        if (productIds.length > 0) {
+          hydratedProducts = await db.select()
+            .from(products)
+            .where(inArray(products.id, productIds));
+        }
+
+        return {
+          ...section,
+          products: hydratedProducts
+        };
+      })
+    );
+  }
+
+  // 3. Fallback: If no menu item OR no sections, try to find sections by title matching the slug
+  if (sectionsWithProducts.length === 0 || sectionsWithProducts.every(s => s.products.length === 0)) {
+    const standaloneSections = await db.select()
+      .from(pageSections)
+      .where(sql`LOWER(${pageSections.title}) = ${decodedSlug.toLowerCase()}`)
+      .orderBy(asc(pageSections.displayOrder));
+
+    if (standaloneSections.length > 0) {
+      const hydratedStandalone = await Promise.all(
+        standaloneSections.map(async (section) => {
+          const productIds = section.productIds
+            .split(",")
+            .map(id => parseInt(id.trim()))
+            .filter(id => !isNaN(id));
+
+          let hydratedProducts: any[] = [];
+          if (productIds.length > 0) {
+            hydratedProducts = await db.select()
+              .from(products)
+              .where(inArray(products.id, productIds));
+          }
+
+          return {
+            ...section,
+            products: hydratedProducts
+          };
+        })
+      );
+      sectionsWithProducts = hydratedStandalone.filter(s => s.products.length > 0);
+    }
+  }
+
+  // 4. Second Fallback: If still nothing, search products by category column
+  if (sectionsWithProducts.length === 0) {
+    const categoryProducts = await db.select()
+      .from(products)
+      .where(sql`LOWER(${products.category}) = ${decodedSlug.toLowerCase()}`);
+
+    if (categoryProducts.length > 0) {
+      sectionsWithProducts = [{
+        id: 0,
+        title: "All Products",
+        products: categoryProducts
+      }];
+    }
+  }
+
+  // 5. Final check - if absolutely nothing found
+  if (sectionsWithProducts.length === 0 && !menuItem) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+        <h1 className="text-4xl font-playfair font-bold text-brand mb-4">Category Not Found</h1>
+        <p className="text-brand/60 mb-8">We couldn't find any products in the "{categoryName}" collection.</p>
+        <Link href="/" className="text-[#C5A059] font-bold uppercase tracking-widest text-xs hover:underline">Return Home</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
+      {/* Header */}
+      <div className="mb-10 text-center">
+        <h1 className="text-5xl md:text-6xl font-playfair font-bold text-brand mb-4 tracking-tight">{categoryName}</h1>
+        <div className="w-24 h-1 bg-[#C5A059] mx-auto rounded-full mb-4"></div>
+        <p className="text-brand/70 max-w-2xl mx-auto font-inter leading-relaxed">
+          Explore our curated selection of premium {categoryName.toLowerCase()} pieces, 
+          each designed with meticulous attention to detail and crafted for an impeccable fit.
+        </p>
+      </div>
+      
+      {/* Dynamic Sections */}
+      {sectionsWithProducts.length > 0 ? (
+        <div className="space-y-16">
+          {sectionsWithProducts.map((section) => (
+            <div key={section.id}>
+              <div className="mb-8 border-b border-brand/5 pb-4">
+                <h2 className="text-2xl font-playfair font-bold text-brand uppercase tracking-wider">{section.title}</h2>
+              </div>
+              <ProductGrid 
+                initialProducts={section.products} 
+                showTitle={false}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <section className="py-4 text-center bg-brand/5 rounded-[3rem] border border-brand/10 px-8">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <ShoppingBag className="text-[#C5A059]" size={32} />
+          </div>
+          <h2 className="text-2xl font-playfair font-bold text-brand mb-3">Collection Coming Soon</h2>
+          <p className="text-brand/60 max-w-sm mx-auto">
+            We are currently curating the perfect selection for this category. Check back soon for the latest arrivals.
+          </p>
+        </section>
+      )}
+
+      {/* Footer Grid - Optional/Default if no sections? Or just extra products? */}
+      {/* For now, we'll just show the dynamic sections as requested */}
+    </div>
+  );
+}
