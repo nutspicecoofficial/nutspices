@@ -314,7 +314,7 @@ export default function AdminOrders() {
                         </select>
                         <button 
                           onClick={() => handleUpdateStatus(order.id)}
-                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] && selectedStatus[order.id] === order.status)}
+                          disabled={updatingStatusId === order.id || selectedStatus[order.id] === order.status}
                           className="px-6 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest disabled:opacity-50 flex items-center justify-center min-w-[120px]"
                         >
                           {updatingStatusId === order.id ? <Loader2 size={14} className="animate-spin" /> : "Update Status"}
