@@ -50,11 +50,12 @@ export default function AdminOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<{ [key: number]: string }>({});
+  const [statusFilter, setStatusFilter] = useState("all");
   const itemsPerPage = 20;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, startDate, endDate]);
+  }, [searchTerm, startDate, endDate, statusFilter]);
 
   useEffect(() => {
     async function fetchOrders() {
@@ -99,10 +100,24 @@ export default function AdminOrders() {
     return orders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
   };
 
+  const getStatusBadgeStyle = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "order placed" || s === "pending") return "bg-amber-50 border-amber-200 text-amber-600";
+    if (s === "processing") return "bg-indigo-50 border-indigo-200 text-indigo-600";
+    if (s === "shipped") return "bg-blue-50 border-blue-200 text-blue-600";
+    if (s === "in transit") return "bg-purple-50 border-purple-200 text-purple-600";
+    if (s === "out for delivery") return "bg-pink-50 border-pink-200 text-pink-600";
+    if (s === "delivered" || s === "completed") return "bg-emerald-50 border-emerald-200 text-emerald-600";
+    if (s === "cancelled") return "bg-rose-50 border-rose-200 text-rose-600";
+    return "bg-brand/5 border-brand/10 text-brand/60";
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.id.toString().includes(searchTerm) ||
       order.status.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatusFilter = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
     
     let matchesDate = true;
     if (startDate || endDate) {
@@ -121,7 +136,7 @@ export default function AdminOrders() {
       }
     }
 
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesDate && matchesStatusFilter;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -170,6 +185,23 @@ export default function AdminOrders() {
               className="flex-1 px-3 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:border-[#C5A059] transition-all text-brand text-xs font-medium cursor-pointer"
               title="End Date"
             />
+          </div>
+          <div className="relative w-full sm:w-auto">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full pl-4 pr-10 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]/10 focus:border-[#C5A059] transition-all text-brand text-xs font-bold uppercase tracking-widest cursor-pointer appearance-none"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Order Placed">Order Placed</option>
+              <option value="Processing">Processing</option>
+              <option value="Shipped">Shipped</option>
+              <option value="In Transit">In Transit</option>
+              <option value="Out for Delivery">Out for Delivery</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-brand/30 pointer-events-none" size={16} />
           </div>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30" size={18} />
@@ -226,7 +258,7 @@ export default function AdminOrders() {
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <h3 className="text-lg font-bold text-brand">Order <span className="text-brand/30 font-medium">#00{order.id}</span></h3>
-                      <span className="px-2 py-0.5 bg-brand/5 border border-brand/10 text-[8px] font-black uppercase tracking-widest text-brand/60 rounded-full">
+                      <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest rounded-full ${getStatusBadgeStyle(order.status)}`}>
                         {order.status}
                       </span>
                     </div>
