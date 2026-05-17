@@ -27,7 +27,6 @@ export async function GET() {
       shippingAddress: orders.shippingAddress,
       createdAt: orders.createdAt,
       paymentId: orders.paymentId,
-      customerPhone: user.phoneNumber,
     })
     .from(orders)
     .where(eq(orders.userId, user.id))
@@ -51,6 +50,7 @@ export async function GET() {
 
       return {
         ...order,
+        customerPhone: user.phoneNumber,
         items: items.map(item => {
           let imageUrl = "/placeholder-product.png";
           try {
