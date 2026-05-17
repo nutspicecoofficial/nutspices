@@ -48,8 +48,8 @@ export async function PATCH(
 
     const order = orderRows[0];
 
-    // Only allow cancellation if order is still pending
-    if (order.status !== "pending") {
+    // Only allow cancellation if order is in a pre-shipping state
+    if (!["Order Placed", "Processing", "pending"].includes(order.status)) {
       return NextResponse.json({
         success: false,
         error: `Cannot cancel an order with status '${order.status}'.`,
