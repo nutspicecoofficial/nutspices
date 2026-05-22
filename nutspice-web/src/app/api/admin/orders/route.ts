@@ -24,6 +24,11 @@ export async function GET() {
       shippingAddress: orders.shippingAddress,
       customerName: users.fullName,
       customerPhone: users.phoneNumber,
+      paymentMode: orders.paymentMode,
+      paymentStatus: orders.paymentStatus,
+      amountPaid: orders.amountPaid,
+      razorpayOrderId: orders.razorpayOrderId,
+      razorpayPaymentId: orders.razorpayPaymentId,
     })
     .from(orders)
     .leftJoin(users, eq(orders.userId, users.id))

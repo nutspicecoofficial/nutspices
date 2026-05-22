@@ -78,6 +78,10 @@ export const orders = sqliteTable("orders", {
   shippingAddress: text("shipping_address"),
   paymentId: text("payment_id"),
   razorpayOrderId: text("razorpay_order_id"),
+  paymentMode: text("payment_mode"),
+  paymentStatus: text("payment_status"),
+  amountPaid: real("amount_paid"),
+  razorpayPaymentId: text("razorpay_payment_id"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 

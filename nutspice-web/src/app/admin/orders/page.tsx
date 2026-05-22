@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import PaymentDetailsCard from "@/components/admin/PaymentDetailsCard";
 import { 
   ShoppingBag, 
   Search, 
@@ -38,6 +39,11 @@ type Order = {
   customerName: string;
   customerPhone: string;
   items: OrderItem[];
+  paymentMode?: string | null;
+  paymentStatus?: string | null;
+  amountPaid?: number | null;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
 };
 
 export default function AdminOrders() {
@@ -302,24 +308,34 @@ export default function AdminOrders() {
               {expandedOrder === order.id && (
                 <div className="px-6 pb-6 pt-1 border-t border-brand/5 bg-brand/[0.005]">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
-                    <div>
-                      <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Items Purchased</h4>
-                      <div className="space-y-2">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-brand/5 shadow-sm">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-brand/5 rounded-lg flex items-center justify-center">
-                                <Package size={14} className="text-brand/30" />
+                    <div className="flex flex-col gap-6">
+                      <div>
+                        <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Items Purchased</h4>
+                        <div className="space-y-2">
+                          {order.items.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-brand/5 shadow-sm">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-brand/5 rounded-lg flex items-center justify-center">
+                                  <Package size={14} className="text-brand/30" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-brand">{item.productName}</p>
+                                  <p className="text-[9px] font-bold text-brand/40 uppercase tracking-widest">Qty: {item.quantity} • {item.size}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-xs font-bold text-brand">{item.productName}</p>
-                                <p className="text-[9px] font-bold text-brand/40 uppercase tracking-widest">Qty: {item.quantity} • {item.size}</p>
-                              </div>
+                              <p className="text-xs font-bold text-brand font-sans">₹{item.price * item.quantity}</p>
                             </div>
-                            <p className="text-xs font-bold text-brand font-sans">₹{item.price * item.quantity}</p>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
+
+                      <PaymentDetailsCard
+                        paymentMode={order.paymentMode}
+                        paymentStatus={order.paymentStatus}
+                        amountPaid={order.amountPaid}
+                        razorpayOrderId={order.razorpayOrderId}
+                        razorpayPaymentId={order.razorpayPaymentId}
+                      />
                     </div>
                     
                     <div className="flex flex-col justify-between">
