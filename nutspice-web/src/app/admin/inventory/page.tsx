@@ -38,8 +38,9 @@ export default function InventoryPage() {
   const [data, setData] = useState<Record<string, ProductStats[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "most-selling" | "low-stock" | "out-of-stock">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     fetchInventory();
@@ -51,8 +52,6 @@ export default function InventoryPage() {
       const result = await res.json();
       if (result.success) {
         setData(result.data);
-        // Expand all categories by default
-        setExpandedCategories(Object.keys(result.data));
       }
     } catch (error) {
       console.error("Failed to fetch inventory", error);
@@ -61,41 +60,48 @@ export default function InventoryPage() {
     }
   };
 
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(category) 
-        ? prev.filter(c => c !== category) 
-        : [...prev, category]
-    );
+  const scrollToTop = () => {
+    const container = document.getElementById('admin-scroll-container');
+    if (container) {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // fallback
+    }
   };
 
-  const filteredData = Object.entries(data).reduce((acc, [category, products]) => {
-    let filtered = products.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchTerm.toLowerCase())
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab]);
+
+  const allProducts = Object.values(data).flat();
+
+  let filteredProducts = allProducts.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Apply Tab Filters
+  if (activeTab === "most-selling") {
+    // For Most Selling, products must have at least 1 sale
+    filteredProducts = filteredProducts.filter(p => (p.sold + p.toBeDelivered) > 0);
+  } else if (activeTab === "low-stock") {
+    filteredProducts = filteredProducts.filter(p => 
+      (p.remaining < 10 && p.remaining > 0) || 
+      (p.variations && p.variations.some(v => v.remaining < 10 && v.remaining > 0))
     );
+  } else if (activeTab === "out-of-stock") {
+    filteredProducts = filteredProducts.filter(p => 
+      p.remaining === 0 || 
+      (p.variations && p.variations.some(v => v.remaining === 0))
+    );
+  }
 
-    // Apply Tab Filters
-    if (activeTab === "most-selling") {
-      // For Most Selling, we still show by category but products must have at least 1 sale
-      filtered = filtered.filter(p => (p.sold + p.toBeDelivered) > 0).sort((a, b) => (b.sold + b.toBeDelivered) - (a.sold + a.toBeDelivered));
-    } else if (activeTab === "low-stock") {
-      filtered = filtered.filter(p => 
-        (p.remaining < 10 && p.remaining > 0) || 
-        (p.variations && p.variations.some(v => v.remaining < 10 && v.remaining > 0))
-      );
-    } else if (activeTab === "out-of-stock") {
-      filtered = filtered.filter(p => 
-        p.remaining === 0 || 
-        (p.variations && p.variations.some(v => v.remaining === 0))
-      );
-    }
+  // Sort alphabetically as requested
+  filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
 
-    if (filtered.length > 0) {
-      acc[category] = filtered;
-    }
-    return acc;
-  }, {} as Record<string, ProductStats[]>);
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const currentProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   if (loading) {
     return (
@@ -159,9 +165,9 @@ export default function InventoryPage() {
         })}
       </div>
 
-      {/* Categories */}
+      {/* Product Grid */}
       <div className="space-y-8">
-        {Object.keys(filteredData).length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <div className="bg-white rounded-[2.5rem] p-20 shadow-sm border border-brand/5 text-center">
             <div className="w-20 h-20 bg-brand/5 rounded-full flex items-center justify-center mx-auto mb-6">
               <Box size={40} className="text-brand/20" />
@@ -170,131 +176,174 @@ export default function InventoryPage() {
             <p className="text-brand/60 font-medium max-w-sm mx-auto">Try adjusting your search terms to find specific inventory items.</p>
           </div>
         ) : (
-          Object.entries(filteredData).map(([category, products]) => (
-            <div key={category} className="space-y-4">
-              <button 
-                onClick={() => toggleCategory(category)}
-                className="w-full flex items-center justify-between p-4 bg-brand/[0.02] hover:bg-brand/[0.05] rounded-2xl transition-all"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-[#C5A059]" />
-                  <h2 className="text-sm font-black uppercase tracking-widest text-brand">{category}</h2>
-                  <span className="text-[10px] font-bold text-brand/30 bg-white border border-brand/5 px-2 py-0.5 rounded-full">
-                    {products.length} Products
-                  </span>
-                </div>
-                {expandedCategories.includes(category) ? <ChevronUp size={16} className="text-brand/30" /> : <ChevronDown size={16} className="text-brand/30" />}
-              </button>
-
-              {expandedCategories.includes(category) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {products.map((product) => (
-                    <div key={product.id} className="bg-white rounded-[2rem] border border-brand/5 p-6 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
-                      {/* Product Header */}
-                      <div className="flex items-start space-x-4 mb-6">
-                        <div className="w-20 h-20 bg-brand/5 rounded-2xl overflow-hidden flex-shrink-0 border border-brand/5">
-                          {product.image ? (
-                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-brand/20">
-                              <ImageIcon size={24} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-brand truncate mb-1">{product.name}</h3>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest">₹{product.basePrice.toLocaleString()}</span>
-                            <span className="text-brand/10">|</span>
-                            <span className="text-[10px] font-bold text-brand/40 uppercase tracking-widest truncate">{product.category}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100/50 text-center">
-                          <p className="text-[8px] font-black text-green-600 uppercase tracking-widest mb-1">Sold</p>
-                          <div className="flex items-center justify-center space-x-1">
-                            <TrendingUp size={12} className="text-green-500" />
-                            <p className="text-lg font-black text-green-700">{product.sold}</p>
-                          </div>
-                        </div>
-                        
-                        <div className={`p-4 rounded-2xl border text-center ${product.remaining < 10 ? 'bg-red-50/50 border-red-100/50' : 'bg-brand/5 border-brand/5'}`}>
-                          <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${product.remaining < 10 ? 'text-red-600' : 'text-brand/40'}`}>Remaining</p>
-                          <div className="flex items-center justify-center space-x-1">
-                            {product.remaining < 10 && <AlertCircle size={12} className="text-red-500" />}
-                            <p className={`text-lg font-black ${product.remaining < 10 ? 'text-red-700' : 'text-brand'}`}>{product.remaining}</p>
-                          </div>
-                        </div>
-
-                        <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 text-center">
-                          <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1">To be Deliver</p>
-                          <div className="flex items-center justify-center space-x-1">
-                            <Truck size={12} className="text-blue-500" />
-                            <p className="text-lg font-black text-blue-700">{product.toBeDelivered}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Variations Breakdown */}
-                      {product.variations && product.variations.length > 0 && (
-                        <div className="mt-6 pt-6 border-t border-brand/5">
-                          <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Box size={12} className="text-[#C5A059]" />
-                            Variations Stock
-                          </p>
-                          <div className="space-y-3">
-                            {product.variations.map((v) => (
-                              <div key={v.id} className="flex items-center justify-between p-3 bg-brand/[0.02] rounded-xl border border-brand/5 group/v">
-                                <div className="flex items-center gap-3">
-                                  <span className="w-12 text-[10px] font-black text-brand bg-white border border-brand/5 px-2 py-1 rounded-lg text-center shadow-sm">
-                                    {v.size}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 sm:gap-4">
-                                  <div className="text-center min-w-[60px]">
-                                    <p className="text-[7px] font-black text-brand uppercase tracking-widest mb-0.5">Stock Left</p>
-                                    <p className={`text-xs font-black ${v.remaining === 0 ? 'text-red-600' : 'text-brand'}`}>
-                                      {v.remaining}
-                                    </p>
-                                  </div>
-                                  <div className="text-center min-w-[50px]">
-                                    <p className="text-[7px] font-black text-green-600 uppercase tracking-widest mb-0.5">Sold</p>
-                                    <p className="text-xs font-black text-green-700">{v.sold}</p>
-                                  </div>
-                                  <div className="text-center min-w-[70px]">
-                                    <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-0.5">To be Delivered</p>
-                                    <p className="text-xs font-black text-blue-700">{v.toBeDelivered}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Low Stock Warning */}
-                      {product.remaining < 10 && product.remaining > 0 && (
-                        <div className="mt-4 py-2 px-3 bg-red-600 text-white rounded-xl flex items-center justify-center space-x-2 animate-pulse">
-                          <AlertCircle size={12} />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Low Stock Warning</span>
-                        </div>
-                      )}
-                      
-                      {product.remaining === 0 && (
-                        <div className="mt-4 py-2 px-3 bg-gray-900 text-white rounded-xl flex items-center justify-center space-x-2">
-                          <Box size={12} />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Out of Stock</span>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              {currentProducts.map((product) => (
+                <div key={product.id} className="bg-white rounded-[2rem] border border-brand/5 p-6 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+                  {/* Product Header */}
+                  <div className="flex items-start space-x-4 mb-6">
+                    <div className="w-20 h-20 bg-brand/5 rounded-2xl overflow-hidden flex-shrink-0 border border-brand/5">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-brand/20">
+                          <ImageIcon size={24} />
                         </div>
                       )}
                     </div>
-                  ))}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-brand truncate mb-1">{product.name}</h3>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest">₹{product.basePrice.toLocaleString()}</span>
+                        <span className="text-brand/10">|</span>
+                        <span className="text-[10px] font-bold text-brand/40 uppercase tracking-widest truncate">{product.category}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100/50 text-center">
+                      <p className="text-[8px] font-black text-green-600 uppercase tracking-widest mb-1">Sold</p>
+                      <div className="flex items-center justify-center space-x-1">
+                        <TrendingUp size={12} className="text-green-500" />
+                        <p className="text-lg font-black text-green-700">{product.sold}</p>
+                      </div>
+                    </div>
+                    
+                    <div className={`p-4 rounded-2xl border text-center ${product.remaining < 10 ? 'bg-red-50/50 border-red-100/50' : 'bg-brand/5 border-brand/5'}`}>
+                      <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${product.remaining < 10 ? 'text-red-600' : 'text-brand/40'}`}>Remaining</p>
+                      <div className="flex items-center justify-center space-x-1">
+                        {product.remaining < 10 && <AlertCircle size={12} className="text-red-500" />}
+                        <p className={`text-lg font-black ${product.remaining < 10 ? 'text-red-700' : 'text-brand'}`}>{product.remaining}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 text-center">
+                      <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1">To be Deliver</p>
+                      <div className="flex items-center justify-center space-x-1">
+                        <Truck size={12} className="text-blue-500" />
+                        <p className="text-lg font-black text-blue-700">{product.toBeDelivered}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Variations Breakdown */}
+                  {product.variations && product.variations.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-brand/5">
+                      <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Box size={12} className="text-[#C5A059]" />
+                        Variations Stock
+                      </p>
+                      <div className="space-y-3">
+                        {product.variations.map((v) => (
+                          <div key={v.id} className="flex items-center justify-between p-3 bg-brand/[0.02] rounded-xl border border-brand/5 group/v">
+                            <div className="flex items-center gap-3">
+                              <span className="w-12 text-[10px] font-black text-brand bg-white border border-brand/5 px-2 py-1 rounded-lg text-center shadow-sm">
+                                {v.size}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-4">
+                              <div className="text-center min-w-[60px]">
+                                <p className="text-[7px] font-black text-brand uppercase tracking-widest mb-0.5">Stock Left</p>
+                                <p className={`text-xs font-black ${v.remaining === 0 ? 'text-red-600' : 'text-brand'}`}>
+                                  {v.remaining}
+                                </p>
+                              </div>
+                              <div className="text-center min-w-[50px]">
+                                <p className="text-[7px] font-black text-green-600 uppercase tracking-widest mb-0.5">Sold</p>
+                                <p className="text-xs font-black text-green-700">{v.sold}</p>
+                              </div>
+                              <div className="text-center min-w-[70px]">
+                                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-0.5">To be Delivered</p>
+                                <p className="text-xs font-black text-blue-700">{v.toBeDelivered}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Low Stock Warning */}
+                  {product.remaining < 10 && product.remaining > 0 && (
+                    <div className="mt-4 py-2 px-3 bg-red-600 text-white rounded-xl flex items-center justify-center space-x-2 animate-pulse">
+                      <AlertCircle size={12} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Low Stock Warning</span>
+                    </div>
+                  )}
+                  
+                  {product.remaining === 0 && (
+                    <div className="mt-4 py-2 px-3 bg-gray-900 text-white rounded-xl flex items-center justify-center space-x-2">
+                      <Box size={12} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Out of Stock</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-12 flex justify-center items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setCurrentPage(p => Math.max(1, p - 1));
+                    scrollToTop();
+                  }}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 rounded-full border border-brand/10 flex items-center justify-center text-brand/50 hover:bg-brand/5 hover:text-brand disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                >
+                  <ChevronDown size={18} className="rotate-90" />
+                </button>
+                
+                <div className="flex items-center space-x-1 px-2 overflow-x-auto no-scrollbar max-w-full">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                    // Show first, last, current, and surrounding pages
+                    if (
+                      page === 1 || 
+                      page === totalPages || 
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => {
+                            setCurrentPage(page);
+                            scrollToTop();
+                          }}
+                          className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                            currentPage === page 
+                              ? 'bg-brand text-[#C5A059] shadow-md scale-110' 
+                              : 'text-brand/50 hover:bg-brand/5 hover:text-brand border border-transparent'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (
+                      page === currentPage - 2 || 
+                      page === currentPage + 2
+                    ) {
+                      return <span key={page} className="text-brand/30 px-1">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setCurrentPage(p => Math.min(totalPages, p + 1));
+                    scrollToTop();
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 rounded-full border border-brand/10 flex items-center justify-center text-brand/50 hover:bg-brand/5 hover:text-brand disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                >
+                  <ChevronDown size={18} className="-rotate-90" />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

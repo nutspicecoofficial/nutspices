@@ -14,4 +14,9 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+// Disable app verification for local testing (Requires setting up a Test Phone Number in Firebase Console)
+if (process.env.NODE_ENV === "development") {
+  auth.settings.appVerificationDisabledForTesting = true;
+}
+
 export { auth };
