@@ -55,23 +55,7 @@ export async function getCouriers(payload: any) {
   if (USE_MOCK) {
     return mockService.getCouriers(payload);
   }
-  // In production, return configured Xpressbees options
-  return [
-    {
-      id: "xb_surface",
-      name: "Xpressbees Surface",
-      charge: 65.0,
-      estimatedDays: 5,
-      rating: 4.3,
-    },
-    {
-      id: "xb_express",
-      name: "Xpressbees Express (Air)",
-      charge: 110.0,
-      estimatedDays: 2,
-      rating: 4.8,
-    }
-  ];
+  return xpressbeesService.getCouriersXpressbees();
 }
 
 /**

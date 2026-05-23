@@ -86,21 +86,37 @@ export async function getXpressbeesToken(): Promise<string> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        email: username, // The franchise login payload fields uses 'email' but receives franchise username
+        username: username,
         password: password,
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Authentication request failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `Authentication request failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    const token = data.data || data.token || (data.status === true && typeof data.token === "string" ? data.token : null);
-    
+    if (data.status !== true) {
+      throw new Error(data.message || `Authentication failed: ${JSON.stringify(data)}`);
+    }
+
+    const token = data.data;
     if (!token) {
-      throw new Error(`Token missing from auth response payload: ${JSON.stringify(data)}`);
+      throw new Error("Token missing from authentication response data.");
     }
 
     cachedToken = token;
@@ -110,6 +126,50 @@ export async function getXpressbeesToken(): Promise<string> {
   } catch (error: any) {
     console.error("Xpressbees authentication failed:", error);
     throw new Error(`Xpressbees Authentication Failure: ${error.message}`);
+  }
+}
+
+/**
+ * Retrieves the list of available couriers from Xpressbees.
+ */
+export async function getCouriersXpressbees(): Promise<any[]> {
+  try {
+    const token = await getXpressbeesToken();
+
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/courier`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Courier list request failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    if (data.status !== true) {
+      throw new Error(data.message || `Failed to fetch courier list: ${JSON.stringify(data)}`);
+    }
+
+    return data.data || [];
+  } catch (error: any) {
+    console.error("Xpressbees get couriers error:", error);
+    throw new Error(`Xpressbees Get Couriers Failure: ${error.message}`);
   }
 }
 
