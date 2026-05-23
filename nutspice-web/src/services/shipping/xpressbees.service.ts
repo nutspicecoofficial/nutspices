@@ -16,6 +16,16 @@ import {
 
 const getApiUrl = () => process.env.XPRESSBEES_API_URL || "https://ship.xpressbees.com/api";
 
+export const CONSIGNER_DATA = {
+  consigner_name: "NutspiceCo Warehouse",
+  consigner_phone: "9880909090",
+  consigner_pincode: "122002",
+  consigner_city: "Gurugram",
+  consigner_state: "Haryana",
+  consigner_address: "Sikandarpur metro station",
+  consigner_gst_number: ""
+};
+
 // In-memory token cache
 let cachedToken: string | null = null;
 let tokenExpiryTime: number = 0;
@@ -193,32 +203,54 @@ export async function generateShipmentXpressbees(
 
     const weight = packageDetails?.weight || 0.5;
     const length = packageDetails?.length || 10;
-    const width = packageDetails?.width || 10;
+    const width = packageDetails?.width || packageDetails?.breadth || 10;
     const height = packageDetails?.height || 10;
 
     const orderId = order.id || order.orderId || Math.floor(1000 + Math.random() * 9000);
-    const paymentMode = order.paymentMode === "COD" ? "COD" : "Prepaid";
+    const paymentMode = order.paymentMode || order.payment_method || "prepaid";
     const totalAmount = order.totalAmount || order.amount || 0;
 
     const payload = {
-      order_number: `NS${orderId}`, // Nutspice order prefix is NS
-      payment_method: paymentMode,
+      id: `NS${orderId}`,
+      unique_order_number: "yes",
+      payment_method: paymentMode.toUpperCase() === "COD" ? "COD" : "prepaid",
+      consigner_name: CONSIGNER_DATA.consigner_name,
+      consigner_phone: CONSIGNER_DATA.consigner_phone,
+      consigner_pincode: CONSIGNER_DATA.consigner_pincode,
+      consigner_city: CONSIGNER_DATA.consigner_city,
+      consigner_state: CONSIGNER_DATA.consigner_state,
+      consigner_address: CONSIGNER_DATA.consigner_address,
+      consigner_gst_number: CONSIGNER_DATA.consigner_gst_number || "",
       consignee_name: customerName,
       consignee_phone: customerPhone,
-      consignee_address: address,
       consignee_pincode: pincode,
       consignee_city: city,
       consignee_state: state,
-      weight: weight,
-      length: length,
-      width: width,
-      height: height,
-      declared_value: totalAmount,
+      consignee_address: address,
+      consignee_gst_number: order.consigneeGst || "",
       products: items.map((item: any) => ({
-        name: item.productName || item.name || "Nutspice Fit Product",
-        qty: item.quantity || item.qty || 1,
-        price: item.price || 0
-      }))
+        product_name: item.productName || item.name || "Nutspice Fit Product",
+        product_qty: String(item.quantity || item.qty || 1),
+        product_price: String(item.price || 0),
+        product_sku: item.sku || item.productSku || "SKU001"
+      })),
+      invoice: [
+        {
+          invoice_number: order.invoiceNumber || `INV-NS-${orderId}`,
+          invoice_date: order.invoiceDate || new Date().toISOString().split("T")[0]
+        }
+      ],
+      weight: String(Math.round(weight * 1000)), // kg to grams as string
+      length: String(length),
+      breadth: String(width),
+      height: String(height),
+      courier_id: String(packageDetails?.courierId || "01"),
+      pickup_location: "franchise",
+      shipping_charges: String(order.shippingCharges || 0),
+      cod_charges: String(order.codCharges || 0),
+      discount: String(order.discount || 0),
+      order_amount: String(totalAmount),
+      collectable_amount: paymentMode.toUpperCase() === "COD" ? String(totalAmount) : "0"
     };
 
     const response = await fetch(`${getApiUrl()}/franchise/shipments`, {
@@ -231,24 +263,37 @@ export async function generateShipmentXpressbees(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Shipment registration failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `Shipment registration failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    const awb = data.awb_number || data.awb || data.data?.awb_number;
-    
-    if (!awb) {
-      throw new Error(`AWB allocation failed, missing from response: ${JSON.stringify(data)}`);
+    if (data.response !== true) {
+      throw new Error(data.message || `Shipment registration failed: ${JSON.stringify(data)}`);
     }
 
     return {
       success: true,
-      awbNumber: awb,
+      awbNumber: data.awb_number,
       courierName: "Xpressbees",
       shippingStatus: "3_AWB_GENERATED",
-      labelUrl: data.label_url || data.label || data.data?.label_url || `https://ship.xpressbees.com/labels/download/${awb}.pdf`,
-      estimatedDelivery: data.estimated_delivery || data.data?.estimated_delivery || new Date(Date.now() + 86400000 * 3).toISOString()
+      labelUrl: data.label,
+      estimatedDelivery: data.estimated_delivery || new Date(Date.now() + 86400000 * 3).toISOString(),
+      shippingId: data.shipping_id,
+      courierId: data.courier_id
     };
   } catch (error: any) {
     console.error("Xpressbees generate shipment error:", error);

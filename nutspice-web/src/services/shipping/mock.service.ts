@@ -25,6 +25,8 @@ export interface ShipmentResponse {
   shippingStatus: string;
   labelUrl: string;
   estimatedDelivery: string;
+  shippingId?: number;
+  courierId?: string;
 }
 
 export interface PickupResponse {
