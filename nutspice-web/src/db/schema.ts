@@ -82,6 +82,11 @@ export const orders = sqliteTable("orders", {
   paymentStatus: text("payment_status"),
   amountPaid: real("amount_paid"),
   razorpayPaymentId: text("razorpay_payment_id"),
+  orderStatus: text("order_status").default("0_PLACED"), // Valid states: '0_PLACED', '1_CONFIRMED', '2_PROCESSING', 'CANCELLED'
+  shippingStatus: text("shipping_status").default("PENDING"), // Valid states: 'PENDING', '3_AWB_GENERATED', '4_PICKUP_REQUESTED', 'PICKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'SHIPMENT_CANCELLED'
+  awbNumber: text("awb_number"),
+  shippingDetails: text("shipping_details"),
+  cancelReason: text("cancel_reason"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
