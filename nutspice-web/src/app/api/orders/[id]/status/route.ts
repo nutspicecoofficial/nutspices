@@ -170,7 +170,17 @@ export async function PATCH(
     // Standard shippingStatus updates mapping to general status
     else if (shippingStatus) {
       updates.shippingStatus = shippingStatus;
-      if (shippingStatus === "PICKED") {
+      if (shippingStatus === "PENDING") {
+        updates.awbNumber = null;
+        updates.shippingDetails = null;
+        if (order.awbNumber) {
+          try {
+            await cancelShipment(order.awbNumber);
+          } catch (shipmentCancelErr: any) {
+            console.error("Warning: Failed to cancel courier shipment during downgrade to PENDING:", shipmentCancelErr);
+          }
+        }
+      } else if (shippingStatus === "PICKED") {
         updates.status = "In Transit";
       } else if (shippingStatus === "IN_TRANSIT") {
         updates.status = "In Transit";

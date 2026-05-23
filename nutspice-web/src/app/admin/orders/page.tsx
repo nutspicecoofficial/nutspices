@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import PaymentDetailsCard from "@/components/admin/PaymentDetailsCard";
+import CancelOrderModal from "@/components/admin/CancelOrderModal";
+import ShippingDimensionsModal from "@/components/admin/ShippingDimensionsModal";
+import CancelShipmentModal from "@/components/admin/CancelShipmentModal";
+import DowngradeConfirmationModal from "@/components/admin/DowngradeConfirmationModal";
 import { 
   ShoppingBag, 
   Search, 
@@ -18,7 +22,8 @@ import {
   XCircle,
   FileText,
   ChevronDown,
-  Truck
+  Truck,
+  Info
 } from "lucide-react";
 
 type OrderItem = {
@@ -44,7 +49,226 @@ type Order = {
   amountPaid?: number | null;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  orderStatus?: string | null;
+  shippingStatus?: string | null;
+  awbNumber?: string | null;
+  shippingDetails?: string | null;
 };
+
+interface ActionOption {
+  id: string;
+  label: string;
+  tooltipText: string;
+}
+
+interface FulfillmentActionsPanelProps {
+  order: Order;
+  onStatusTransition: (
+    orderId: number,
+    payload: {
+      orderStatus?: string;
+      shippingStatus?: string;
+      packageDetails?: any;
+      cancelReason?: string;
+    }
+  ) => Promise<void>;
+  setActiveCancelOrderId: (id: number | null) => void;
+  setActiveAwbOrderId: (id: number | null) => void;
+  setActiveCancelShipmentId: (id: number | null) => void;
+  setActiveCancelShipmentAwb: (awb: string | null) => void;
+}
+
+const statusHierarchy = ['0_PLACED', '1_CONFIRMED', '2_PROCESSING', '3_AWB_GENERATED', 'DELIVERED', 'CANCELLED'];
+
+const getCurrentStatusKey = (o: Order): string => {
+  if (o.orderStatus === "CANCELLED" || (o.status || "").toLowerCase() === "cancelled") {
+    return "CANCELLED";
+  }
+  if (o.shippingStatus === "DELIVERED" || (o.status || "").toLowerCase() === "delivered") {
+    return "DELIVERED";
+  }
+  if (o.shippingStatus === "3_AWB_GENERATED" || o.shippingStatus === "4_PICKUP_REQUESTED" || (o.shippingStatus || "").startsWith("3_") || (o.shippingStatus || "").startsWith("4_") || o.awbNumber) {
+    return "3_AWB_GENERATED";
+  }
+  return o.orderStatus || "0_PLACED";
+};
+
+function FulfillmentActionsPanel({
+  order,
+  onStatusTransition,
+  setActiveCancelOrderId,
+  setActiveAwbOrderId,
+  setActiveCancelShipmentId,
+  setActiveCancelShipmentAwb,
+}: FulfillmentActionsPanelProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<string>("");
+  const [isDowngradeModalOpen, setIsDowngradeModalOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const availableActions: ActionOption[] = [
+    {
+      id: "0_PLACED",
+      label: "0_PLACED (Order Placed)",
+      tooltipText: "Reset status to initial placed state."
+    },
+    {
+      id: "1_CONFIRMED",
+      label: "1_CONFIRMED (Confirmed)",
+      tooltipText: "Mark order as confirmed and ready for packaging."
+    },
+    {
+      id: "2_PROCESSING",
+      label: "2_PROCESSING (Processing)",
+      tooltipText: "Move order to package preparation stage."
+    },
+    {
+      id: "3_AWB_GENERATED",
+      label: "3_AWB_GENERATED (AWB Generated)",
+      tooltipText: "Book shipping consignment and generate courier Airway Bill (AWB)."
+    },
+    {
+      id: "DELIVERED",
+      label: "DELIVERED (Delivered)",
+      tooltipText: "Mark order and shipping delivery as completed."
+    },
+    {
+      id: "CANCELLED",
+      label: "CANCELLED (Cancelled)",
+      tooltipText: "Cancel order fulfillment and release reserved stock."
+    }
+  ];
+
+  const currentStatus = getCurrentStatusKey(order);
+
+  useEffect(() => {
+    setSelectedAction(currentStatus);
+  }, [order.orderStatus, order.shippingStatus, order.status]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const executeTransition = async (target: string) => {
+    switch (target) {
+      case "0_PLACED":
+        await onStatusTransition(order.id, { orderStatus: "0_PLACED", shippingStatus: "PENDING" });
+        break;
+      case "1_CONFIRMED":
+        await onStatusTransition(order.id, { orderStatus: "1_CONFIRMED", shippingStatus: "PENDING" });
+        break;
+      case "2_PROCESSING":
+        await onStatusTransition(order.id, { orderStatus: "2_PROCESSING", shippingStatus: "PENDING" });
+        break;
+      case "3_AWB_GENERATED":
+        setActiveAwbOrderId(order.id);
+        break;
+      case "DELIVERED":
+        await onStatusTransition(order.id, { shippingStatus: "DELIVERED" });
+        break;
+      case "CANCELLED":
+        setActiveCancelOrderId(order.id);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedAction || selectedAction === currentStatus) return;
+
+    const currentIdx = statusHierarchy.indexOf(currentStatus);
+    const targetIdx = statusHierarchy.indexOf(selectedAction);
+
+    if (targetIdx !== -1 && currentIdx !== -1 && targetIdx < currentIdx) {
+      setIsDowngradeModalOpen(true);
+    } else {
+      await executeTransition(selectedAction);
+    }
+  };
+
+  const handleConfirmDowngrade = async () => {
+    setIsDowngradeModalOpen(false);
+    await executeTransition(selectedAction);
+  };
+
+  const selectedActionObj = availableActions.find((a) => a.id === selectedAction);
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full">
+      <div className="relative flex-1 min-w-[220px]" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between pl-4 pr-10 py-3 bg-white border border-brand/10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]/10 focus:border-[#C5A059] transition-all text-brand text-xs font-bold uppercase tracking-widest cursor-pointer text-left"
+        >
+          <span className="truncate">{selectedActionObj ? selectedActionObj.label : "Select Action"}</span>
+          <ChevronDown
+            className={`absolute right-4 top-1/2 -translate-y-1/2 text-brand/35 transition-transform ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            size={16}
+          />
+        </button>
+
+        {isOpen && (
+          <div className="absolute left-0 right-0 mt-1 bg-white border border-brand/10 rounded-xl shadow-lg z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-100 overflow-visible">
+            {availableActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => {
+                  setSelectedAction(action.id);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer hover:bg-brand/[0.03] ${
+                  selectedAction === action.id ? "text-[#C5A059] bg-[#C5A059]/5" : "text-brand"
+                }`}
+              >
+                <div className="relative group shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Info size={14} className="text-brand/40 hover:text-[#C5A059] transition-colors cursor-help" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2.5 bg-[#1B3022] text-white text-[10px] normal-case tracking-normal font-medium rounded-lg shadow-lg z-30 pointer-events-none text-center">
+                    {action.tooltipText}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#1B3022] rotate-45 -translate-y-0.5"></div>
+                  </div>
+                </div>
+                <span className="truncate">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        disabled={!selectedAction || selectedAction === currentStatus}
+        onClick={handleUpdateStatus}
+        className="px-6 py-3 bg-[#1B3022] hover:bg-brand disabled:bg-brand/10 disabled:text-brand/30 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center justify-center min-w-[140px]"
+      >
+        UPDATE STATUS
+      </button>
+
+      {isDowngradeModalOpen && (
+        <DowngradeConfirmationModal
+          isOpen={true}
+          orderId={order.id}
+          currentStatus={currentStatus}
+          targetStatus={selectedAction}
+          onClose={() => setIsDowngradeModalOpen(false)}
+          onConfirm={handleConfirmDowngrade}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -54,10 +278,14 @@ export default function AdminOrders() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<{ [key: number]: string }>({});
   const [statusFilter, setStatusFilter] = useState("all");
   const itemsPerPage = 20;
+
+  // Modal tracking states
+  const [activeCancelOrderId, setActiveCancelOrderId] = useState<number | null>(null);
+  const [activeAwbOrderId, setActiveAwbOrderId] = useState<number | null>(null);
+  const [activeCancelShipmentId, setActiveCancelShipmentId] = useState<number | null>(null);
+  const [activeCancelShipmentAwb, setActiveCancelShipmentAwb] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -80,25 +308,43 @@ export default function AdminOrders() {
     fetchOrders();
   }, []);
 
-  const handleUpdateStatus = async (orderId: number) => {
-    const newStatus = selectedStatus[orderId];
-    if (!newStatus || newStatus === orders.find(o => o.id === orderId)?.status) return;
-    
-    setUpdatingStatusId(orderId);
+  const handleStatusTransition = async (
+    orderId: number,
+    payload: {
+      orderStatus?: string;
+      shippingStatus?: string;
+      packageDetails?: any;
+      cancelReason?: string;
+    }
+  ) => {
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}`, {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
-        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  status: data.data.status !== undefined ? data.data.status : o.status,
+                  orderStatus: data.data.orderStatus !== undefined ? data.data.orderStatus : o.orderStatus,
+                  shippingStatus: data.data.shippingStatus !== undefined ? data.data.shippingStatus : o.shippingStatus,
+                  awbNumber: data.data.awbNumber !== undefined ? data.data.awbNumber : o.awbNumber,
+                  shippingDetails: data.data.shippingDetails !== undefined ? data.data.shippingDetails : o.shippingDetails
+                }
+              : o
+          )
+        );
+      } else {
+        alert(data.error || "Failed to update order status.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-    } finally {
-      setUpdatingStatusId(null);
+      alert("Failed to submit status transition.");
     }
   };
 
@@ -264,7 +510,12 @@ export default function AdminOrders() {
           </div>
         ) : (
           paginatedOrders.map((order) => (
-            <div key={order.id} className="bg-white rounded-2xl border border-brand/5 shadow-sm overflow-hidden hover:shadow-md transition-all">
+            <div 
+              key={order.id} 
+              className={`bg-white rounded-2xl border border-brand/5 shadow-sm hover:shadow-md transition-all ${
+                expandedOrder === order.id ? "relative z-10" : ""
+              }`}
+            >
               <div 
                 className="p-4 flex items-center justify-between cursor-pointer group"
                 onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
@@ -306,7 +557,40 @@ export default function AdminOrders() {
 
               {/* Expanded Details */}
               {expandedOrder === order.id && (
-                <div className="px-6 pb-6 pt-1 border-t border-brand/5 bg-brand/[0.005]">
+                <div className="px-6 pb-6 pt-1 border-t border-brand/5 bg-brand/[0.005] rounded-b-2xl">
+                  {/* State Machine Status Header */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-brand/5 p-4 rounded-2xl border border-brand/5 mt-4">
+                    <div>
+                      <p className="text-[8px] font-black text-brand/35 uppercase tracking-wider mb-1">Order State</p>
+                      <span className="px-2.5 py-1 bg-brand/10 text-brand font-bold text-xs rounded-lg uppercase tracking-wide">
+                        {order.orderStatus || "0_PLACED"}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-brand/35 uppercase tracking-wider mb-1">Shipping State</p>
+                      <span className="px-2.5 py-1 bg-[#C5A059]/10 text-[#C5A059] font-bold text-xs rounded-lg uppercase tracking-wide">
+                        {order.shippingStatus || "PENDING"}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-brand/35 uppercase tracking-wider mb-1">Airway Bill (AWB)</p>
+                      {order.awbNumber ? (
+                        <a
+                          href={`https://www.xpressbees.com/track?awb=${order.awbNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#C5A059] font-bold text-xs hover:underline flex items-center gap-1.5"
+                          title="Track with Xpressbees"
+                        >
+                          {order.awbNumber}
+                          <span className="text-[8px] px-1 bg-[#C5A059]/10 rounded font-normal uppercase">Track ↗</span>
+                        </a>
+                      ) : (
+                        <span className="text-brand/30 text-xs font-semibold">Not Allocated</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
                     <div className="flex flex-col gap-6">
                       <div>
@@ -358,36 +642,18 @@ export default function AdminOrders() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 mt-6">
-                        <select
-                          className="flex-1 py-3 px-3 bg-white border border-brand/10 text-brand rounded-xl font-bold text-xs shadow-sm focus:outline-none focus:border-[#C5A059] transition-all disabled:opacity-50 disabled:bg-gray-50"
-                          value={selectedStatus[order.id] || getNormalizedStatus(order.status)}
-                          onChange={(e) => setSelectedStatus({ ...selectedStatus, [order.id]: e.target.value })}
-                          disabled={getNormalizedStatus(order.status) === "Cancelled" || getNormalizedStatus(order.status) === "Delivered"}
-                        >
-                          {(() => {
-                            const STATUS_ORDER = ["Order Placed", "Processing", "Shipped", "In Transit", "Out for Delivery", "Delivered"];
-                            const currentIdx = STATUS_ORDER.indexOf(getNormalizedStatus(order.status));
-                            
-                            return (
-                              <>
-                                {STATUS_ORDER.map((status, idx) => (
-                                  <option key={status} value={status} disabled={currentIdx !== -1 && idx < currentIdx}>
-                                    {status}
-                                  </option>
-                                ))}
-                                <option value="Cancelled">Cancelled</option>
-                              </>
-                            );
-                          })()}
-                        </select>
-                        <button 
-                          onClick={() => handleUpdateStatus(order.id)}
-                          disabled={updatingStatusId === order.id || (selectedStatus[order.id] || getNormalizedStatus(order.status)) === getNormalizedStatus(order.status) || getNormalizedStatus(order.status) === "Cancelled" || getNormalizedStatus(order.status) === "Delivered"}
-                          className="px-6 py-3 bg-[#1B3022] hover:bg-brand text-white rounded-xl font-bold text-[10px] transition-all shadow-md uppercase tracking-widest disabled:opacity-50 flex items-center justify-center min-w-[120px]"
-                        >
-                          {updatingStatusId === order.id ? <Loader2 size={14} className="animate-spin" /> : "Update Status"}
-                        </button>
+                      {/* Action buttons progression panel */}
+                      <div className="mt-6 flex flex-col gap-3">
+                        <p className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-1">Fulfillment Actions</p>
+                        
+                        <FulfillmentActionsPanel
+                          order={order}
+                          onStatusTransition={handleStatusTransition}
+                          setActiveCancelOrderId={setActiveCancelOrderId}
+                          setActiveAwbOrderId={setActiveAwbOrderId}
+                          setActiveCancelShipmentId={setActiveCancelShipmentId}
+                          setActiveCancelShipmentAwb={setActiveCancelShipmentAwb}
+                        />
                       </div>
                     </div>
                   </div>
@@ -419,6 +685,43 @@ export default function AdminOrders() {
             Next
           </button>
         </div>
+      )}
+      {/* State Machine Action Modals */}
+      {activeCancelOrderId !== null && (
+        <CancelOrderModal
+          isOpen={true}
+          orderId={activeCancelOrderId}
+          onClose={() => setActiveCancelOrderId(null)}
+          onConfirm={async (reason) => {
+            await handleStatusTransition(activeCancelOrderId, { orderStatus: "CANCELLED", cancelReason: reason });
+          }}
+        />
+      )}
+
+      {activeAwbOrderId !== null && (
+        <ShippingDimensionsModal
+          isOpen={true}
+          orderId={activeAwbOrderId}
+          onClose={() => setActiveAwbOrderId(null)}
+          onConfirm={async (dimensions) => {
+            await handleStatusTransition(activeAwbOrderId, { shippingStatus: "3_AWB_GENERATED", packageDetails: dimensions });
+          }}
+        />
+      )}
+
+      {activeCancelShipmentId !== null && activeCancelShipmentAwb !== null && (
+        <CancelShipmentModal
+          isOpen={true}
+          orderId={activeCancelShipmentId}
+          awbNumber={activeCancelShipmentAwb}
+          onClose={() => {
+            setActiveCancelShipmentId(null);
+            setActiveCancelShipmentAwb(null);
+          }}
+          onConfirm={async () => {
+            await handleStatusTransition(activeCancelShipmentId, { orderStatus: "CANCELLED" });
+          }}
+        />
       )}
     </div>
   );

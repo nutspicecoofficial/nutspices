@@ -106,7 +106,7 @@ export async function getXpressbeesToken(): Promise<string> {
     cachedToken = token;
     // Cache for 55 minutes
     tokenExpiryTime = Date.now() + 55 * 60 * 1000;
-    return cachedToken;
+    return cachedToken as string;
   } catch (error: any) {
     console.error("Xpressbees authentication failed:", error);
     throw new Error(`Xpressbees Authentication Failure: ${error.message}`);
