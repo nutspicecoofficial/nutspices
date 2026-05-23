@@ -5,6 +5,7 @@
  */
 
 import * as mockService from "./mock.service";
+import * as xpressbeesService from "./xpressbees.service";
 
 const USE_MOCK = process.env.USE_MOCK_SHIPPING === "true";
 
@@ -17,8 +18,7 @@ export async function trackShipment(awbNumber: string) {
   if (USE_MOCK) {
     return mockService.trackShipment(awbNumber);
   }
-  // TODO: Implement actual Xpressbees API call
-  return null;
+  return xpressbeesService.trackShipmentXpressbees(awbNumber);
 }
 
 /**
@@ -28,8 +28,11 @@ export async function generateShipment(orderData: any) {
   if (USE_MOCK) {
     return mockService.generateShipment(orderData);
   }
-  // TODO: Implement actual Xpressbees API call
-  return null;
+  return xpressbeesService.generateShipmentXpressbees(
+    orderData.order || orderData,
+    orderData.items || [],
+    orderData.packageDetails || {}
+  );
 }
 
 /**
@@ -39,8 +42,10 @@ export async function requestPickup(pickupData: any) {
   if (USE_MOCK) {
     return mockService.requestPickup(pickupData);
   }
-  // TODO: Implement actual Xpressbees API call
-  return null;
+  const awbs = Array.isArray(pickupData)
+    ? pickupData
+    : pickupData.awbNumbers || [pickupData.awbNumber || pickupData];
+  return xpressbeesService.requestPickupXpressbees(awbs);
 }
 
 /**
@@ -50,8 +55,23 @@ export async function getCouriers(payload: any) {
   if (USE_MOCK) {
     return mockService.getCouriers(payload);
   }
-  // TODO: Implement actual Xpressbees API call
-  return [];
+  // In production, return configured Xpressbees options
+  return [
+    {
+      id: "xb_surface",
+      name: "Xpressbees Surface",
+      charge: 65.0,
+      estimatedDays: 5,
+      rating: 4.3,
+    },
+    {
+      id: "xb_express",
+      name: "Xpressbees Express (Air)",
+      charge: 110.0,
+      estimatedDays: 2,
+      rating: 4.8,
+    }
+  ];
 }
 
 /**
@@ -61,8 +81,7 @@ export async function cancelShipment(awbNumber: string) {
   if (USE_MOCK) {
     return mockService.cancelShipment(awbNumber);
   }
-  // TODO: Implement actual Xpressbees API call
-  return null;
+  return xpressbeesService.cancelShipmentXpressbees(awbNumber);
 }
 
 /**
@@ -72,8 +91,7 @@ export async function getNDRList() {
   if (USE_MOCK) {
     return mockService.getNDRList();
   }
-  // TODO: Implement actual Xpressbees API call
-  return [];
+  return xpressbeesService.getXpressbeesNDRList();
 }
 
 /**
@@ -83,6 +101,5 @@ export async function createNDR(ndrData: any) {
   if (USE_MOCK) {
     return mockService.createNDR(ndrData);
   }
-  // TODO: Implement actual Xpressbees API call
-  return null;
+  return xpressbeesService.createXpressbeesNDR(ndrData);
 }
