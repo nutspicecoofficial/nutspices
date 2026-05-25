@@ -549,19 +549,35 @@ export async function getXpressbeesNDRList(): Promise<NDRItem[]> {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`NDR retrieval failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `NDR list retrieval failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    const rawList = data.ndr_list || data.data || [];
+    if (data.status !== true) {
+      throw new Error(data.message || `Failed to fetch NDR list: ${JSON.stringify(data)}`);
+    }
 
+    const rawList = data.data || [];
     return rawList.map((item: any) => ({
-      awbNumber: item.awb_number || item.awb || "",
-      reason: item.reason || item.failure_reason || "NDR reported",
-      attempts: item.attempts || item.attempt_count || 1,
-      status: item.status || "NDR_PENDING",
-      reportedAt: item.reported_at || item.created_at || new Date().toISOString()
+      awbNumber: item.awb_number || "",
+      reason: item.courier_remarks || "NDR reported",
+      attempts: typeof item.total_attempts === "number" ? item.total_attempts : parseInt(item.total_attempts || "1"),
+      status: "NDR_ACTION_REQUIRED",
+      reportedAt: item.event_date ? new Date(item.event_date).toISOString() : new Date().toISOString()
     }));
   } catch (error: any) {
     console.error("Xpressbees get NDR list error:", error);
@@ -576,31 +592,62 @@ export async function createXpressbeesNDR(payload: any): Promise<NDRResponse> {
   try {
     const token = await getXpressbeesToken();
 
-    const response = await fetch(`${getApiUrl()}/franchise/ndr`, {
+    const awb = payload.awb || payload.awbNumber;
+    const action = payload.action || "re-attempt";
+    const actionData = payload.actionData || payload.action_data || {};
+    const reAttemptDate = payload.reAttemptDate || payload.re_attempt_date || new Date().toISOString().split("T")[0];
+    const remarks = payload.remarks || "";
+
+    const ndrRequest: any = {
+      awb: awb,
+      action: action,
+      re_attempt_date: reAttemptDate,
+      remarks: remarks
+    };
+
+    if (action === "update-phone" || action === "update-address") {
+      ndrRequest.action_data = actionData;
+    }
+
+    const response = await fetch(`${getApiUrl()}/franchise/ndr/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
-      body: JSON.stringify({
-        awb_number: payload.awbNumber,
-        action: payload.action,
-        reason: payload.reason,
-        remarks: payload.remarks
-      })
+      body: JSON.stringify([ndrRequest])
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`NDR creation failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `NDR creation failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (!result || result.status !== true) {
+      throw new Error(result?.message || `NDR submission failed: ${JSON.stringify(data)}`);
+    }
+
     return {
       success: true,
-      awbNumber: payload.awbNumber,
-      action: payload.action,
-      message: data.message || data.data?.message || `NDR resolution instruction '${payload.action}' received and submitted to courier.`
+      awbNumber: awb,
+      action: action,
+      message: result.message || "NDR resolution instruction submitted successfully."
     };
   } catch (error: any) {
     console.error("Xpressbees NDR submit error:", error);
