@@ -671,46 +671,105 @@ export default function AdminOrders() {
 
                           return (
                             <div>
-                              <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping Documents</h4>
+                              <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping Details & Documents</h4>
                               <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
                                 <FileText size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap gap-4 pt-1">
-                                    {labelUrl && (
-                                      <div className="relative group">
-                                        <a
-                                          href={labelUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors shadow-sm cursor-pointer"
-                                        >
-                                          <Download size={16} />
-                                          Order Label
-                                        </a>
-                                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
-                                          Download the PDF shipping label. Print and attach this securely to the package.
-                                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {manifestUrl && (
-                                      <div className="relative group">
-                                        <a
-                                          href={manifestUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors shadow-sm cursor-pointer"
-                                        >
-                                          <Download size={16} />
-                                          View Manifest
-                                        </a>
-                                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
-                                          Download the pickup manifest PDF. The courier agent must sign this upon package handover.
-                                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
-                                        </div>
-                                      </div>
-                                    )}
+                                  {/* Grid Content */}
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-4">
+                                    <div>
+                                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                                        Invoice Number
+                                      </span>
+                                      <span className="text-xs font-bold text-brand font-mono">
+                                        {shippingDetails?.invoiceNumber || "N/A"}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                                        Invoice Date
+                                      </span>
+                                      <span className="text-xs font-bold text-brand">
+                                        {shippingDetails?.invoiceDate ? new Date(shippingDetails.invoiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                                        Weight
+                                      </span>
+                                      <span className="text-xs font-bold text-brand">
+                                        {(() => {
+                                          const w = shippingDetails?.weight;
+                                          if (w === undefined || w === null || w === "") return "N/A";
+                                          const val = parseFloat(w);
+                                          if (isNaN(val)) return "N/A";
+                                          return val < 15 ? `${val} kg` : `${val} g`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                                        Dimensions
+                                      </span>
+                                      <span className="text-xs font-bold text-brand">
+                                        {(() => {
+                                          const l = shippingDetails?.length;
+                                          const w = shippingDetails?.breadth || shippingDetails?.width;
+                                          const h = shippingDetails?.height;
+                                          if (!l && !w && !h) return "N/A";
+                                          return `${l || "N/A"} x ${w || "N/A"} x ${h || "N/A"} cm`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                                        Courier ID
+                                      </span>
+                                      <span className="text-xs font-semibold text-brand font-mono">
+                                        {shippingDetails?.courierId || "N/A"}
+                                      </span>
+                                    </div>
                                   </div>
+
+                                  {/* Download Buttons Section */}
+                                  {(labelUrl || manifestUrl) && (
+                                    <div className="flex flex-wrap gap-4 pt-4 border-t border-brand/5">
+                                      {labelUrl && (
+                                        <div className="relative group">
+                                          <a
+                                            href={labelUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors shadow-sm cursor-pointer"
+                                          >
+                                            <Download size={16} />
+                                            Order Label
+                                          </a>
+                                          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
+                                            Download the PDF shipping label. Print and attach this securely to the package.
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {manifestUrl && (
+                                        <div className="relative group">
+                                          <a
+                                            href={manifestUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors shadow-sm cursor-pointer"
+                                          >
+                                            <Download size={16} />
+                                            View Manifest
+                                          </a>
+                                          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
+                                            Download the pickup manifest PDF. The courier agent must sign this upon package handover.
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -778,6 +837,7 @@ export default function AdminOrders() {
         <ShippingDimensionsModal
           isOpen={true}
           orderId={activeAwbOrderId}
+          order={orders.find(o => o.id === activeAwbOrderId)}
           onClose={() => setActiveAwbOrderId(null)}
           onConfirm={async (dimensions) => {
             await handleStatusTransition(activeAwbOrderId, { shippingStatus: "3_AWB_GENERATED", packageDetails: dimensions });

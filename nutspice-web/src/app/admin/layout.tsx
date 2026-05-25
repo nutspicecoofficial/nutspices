@@ -23,11 +23,11 @@ const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Reports", href: "/admin/reports", icon: BarChart3 },
   { name: "Inventory", href: "/admin/inventory", icon: Box },
+  { name: "Products", href: "/admin/products", icon: Shirt },
   { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Navbar Settings", href: "/admin/navigation", icon: Map },
   { name: "Home Banners", href: "/admin/home-banners", icon: Sparkles },
   { name: "Home Tabs", href: "/admin/home-tabs", icon: LayoutDashboard },
-  { name: "Products", href: "/admin/products", icon: Shirt },
   { name: "Customers", href: "/admin/customers", icon: Users },
 ];
 

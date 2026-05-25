@@ -123,7 +123,14 @@ export async function PATCH(
         courierName: shipmentRes.courierName || "Xpressbees",
         labelUrl: shipmentRes.labelUrl || "",
         estimatedDelivery: shipmentRes.estimatedDelivery || "",
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        weight: packageDetails?.weight || null,
+        length: packageDetails?.length || null,
+        breadth: packageDetails?.breadth !== undefined ? packageDetails.breadth : (packageDetails?.width !== undefined ? packageDetails.width : null),
+        height: packageDetails?.height || null,
+        invoiceNumber: packageDetails?.invoiceNumber || null,
+        invoiceDate: packageDetails?.invoiceDate || null,
+        courierId: packageDetails?.courierId || null
       });
     } 
     // 4. Trigger Pickup Booking (4_PICKUP_REQUESTED)

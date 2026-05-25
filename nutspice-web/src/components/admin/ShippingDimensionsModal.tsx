@@ -15,27 +15,57 @@ interface ShippingDimensionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (
-    packageDetails: { weight: number; length: number; width: number; height: number },
+    packageDetails: { 
+      weight: number; 
+      length: number; 
+      width: number; 
+      height: number;
+      invoiceNumber?: string;
+      invoiceDate?: string;
+      courierId?: string;
+    },
     courierId: string
   ) => Promise<void>;
   orderId: number;
+  order?: any;
 }
+
+const formatDateForInput = (dateStrOrObj: string | Date): string => {
+  if (!dateStrOrObj) return "";
+  const date = typeof dateStrOrObj === "string" ? new Date(dateStrOrObj) : dateStrOrObj;
+  if (isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function ShippingDimensionsModal({
   isOpen,
   onClose,
   onConfirm,
-  orderId
+  orderId,
+  order
 }: ShippingDimensionsModalProps) {
   const [weight, setWeight] = useState("0.5");
   const [length, setLength] = useState("10");
   const [breadth, setBreadth] = useState("10"); // Breadth maps to width
   const [height, setHeight] = useState("10");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
   const [selectedCourier, setSelectedCourier] = useState("");
   const [couriers, setCouriers] = useState<CourierService[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize invoice fields when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setInvoiceNumber(`NS-INV-${orderId}`);
+      setInvoiceDate(formatDateForInput(new Date()));
+    }
+  }, [orderId, isOpen]);
 
   // Dynamically fetch couriers and rates when dimensions change
   useEffect(() => {
@@ -96,6 +126,16 @@ export default function ShippingDimensionsModal({
       return;
     }
 
+    if (!invoiceNumber.trim()) {
+      setError("Please enter a valid invoice number.");
+      return;
+    }
+
+    if (!invoiceDate) {
+      setError("Please select an invoice date.");
+      return;
+    }
+
     if (!selectedCourier) {
       setError("Please select a courier service.");
       return;
@@ -104,7 +144,18 @@ export default function ShippingDimensionsModal({
     setIsSubmitting(true);
     setError(null);
     try {
-      await onConfirm({ weight: w, length: l, width: b, height: h }, selectedCourier);
+      await onConfirm(
+        { 
+          weight: w, 
+          length: l, 
+          width: b, 
+          height: h, 
+          invoiceNumber, 
+          invoiceDate, 
+          courierId: selectedCourier 
+        }, 
+        selectedCourier
+      );
       onClose();
     } catch (err: any) {
       setError(err.message || "Failed to generate shipment.");
@@ -193,6 +244,37 @@ export default function ShippingDimensionsModal({
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
                   className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Invoice Override */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/5 pb-2">
+              Invoice Details Override
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Invoice Number</label>
+                <input
+                  type="text"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Invoice Date</label>
+                <input
+                  type="date"
+                  value={invoiceDate}
+                  min={order?.createdAt ? formatDateForInput(order.createdAt) : undefined}
+                  max={formatDateForInput(new Date())}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all cursor-pointer"
                   required
                 />
               </div>
