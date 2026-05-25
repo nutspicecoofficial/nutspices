@@ -16,6 +16,7 @@ export interface TrackingResponse {
   status: string;
   carrier: string;
   history: TrackingActivity[];
+  trackingData?: any;
 }
 
 export interface ShipmentResponse {

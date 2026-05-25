@@ -347,26 +347,62 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
   try {
     const token = await getXpressbeesToken();
 
-    const response = await fetch(`${getApiUrl()}/franchise/track/${awbNumber}`, {
-      method: "GET",
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/track_shipment`, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify({
+        awb_number: awbNumber
+      })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Tracking request failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `Tracking request failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    const rawHistory = data.history || data.data?.history || [];
+    if (data.response !== true) {
+      throw new Error(data.message || `Tracking failed: ${JSON.stringify(data)}`);
+    }
 
-    const history = rawHistory.map((item: any) => ({
-      status: item.status || item.activity || "IN_TRANSIT",
-      location: item.location || item.city || "Transit Hub",
-      message: item.message || item.description || "Shipment in transit.",
-      timestamp: item.timestamp || item.date_time || new Date().toISOString()
+    const trackingData = data.tracking_data || {};
+    const rawActivities: any[] = [];
+    const states = ["pending pickup", "in transit", "out for delivery", "delivered"];
+    for (const state of states) {
+      if (Array.isArray(trackingData[state])) {
+        rawActivities.push(...trackingData[state]);
+      }
+    }
+
+    rawActivities.sort((a: any, b: any) => {
+      const timeA = parseInt(a.event_time) || 0;
+      const timeB = parseInt(b.event_time) || 0;
+      return timeA - timeB;
+    });
+
+    const history = rawActivities.map((item: any) => ({
+      status: item.status || item.ship_status || "IN_TRANSIT",
+      location: item.location || "Transit Hub",
+      message: item.message || "Shipment activity recorded.",
+      timestamp: item.event_time 
+        ? new Date(parseInt(item.event_time) * 1000).toISOString() 
+        : new Date().toISOString()
     }));
 
     const status = data.status || data.data?.status || (history.length > 0 ? history[history.length - 1].status : "IN_TRANSIT");
@@ -382,7 +418,8 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
           message: "Shipment details fetched from courier.",
           timestamp: new Date().toISOString()
         }
-      ]
+      ],
+      trackingData: trackingData
     };
   } catch (error: any) {
     console.error("Xpressbees tracking error:", error);
