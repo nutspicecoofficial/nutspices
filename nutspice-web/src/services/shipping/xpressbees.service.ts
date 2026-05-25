@@ -17,12 +17,12 @@ import {
 const getApiUrl = () => process.env.XPRESSBEES_API_URL || "https://ship.xpressbees.com/api";
 
 export const CONSIGNER_DATA = {
-  consigner_name: "NutspiceCo Warehouse",
-  consigner_phone: "9880909090",
-  consigner_pincode: "122002",
-  consigner_city: "Gurugram",
-  consigner_state: "Haryana",
-  consigner_address: "Sikandarpur metro station",
+  consigner_name: "Nutspice Co 9985088446",
+  consigner_phone: "9985088446",
+  consigner_pincode: "500035",
+  consigner_city: "HYDERABAD",
+  consigner_state: "Telangana",
+  consigner_address: "H.No. 11-13-393, Ground Floor, Alkapur Colony, SRK Puram Kothapeta, Hyderabad",
   consigner_gst_number: ""
 };
 
@@ -47,10 +47,10 @@ export function extractPincode(address: string): string {
 export function extractAddressParts(address: string) {
   const pincode = extractPincode(address);
   const parts = address.split(/,+/).map(p => p.trim());
-  
+
   let city = "Delhi";
   let state = "Delhi";
-  
+
   if (parts.length > 2) {
     const pincodeIndex = parts.findIndex(p => p.includes(pincode));
     if (pincodeIndex !== -1) {
@@ -361,7 +361,7 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
 
     const data = await response.json();
     const rawHistory = data.history || data.data?.history || [];
-    
+
     const history = rawHistory.map((item: any) => ({
       status: item.status || item.activity || "IN_TRANSIT",
       location: item.location || item.city || "Transit Hub",
@@ -447,7 +447,7 @@ export async function getXpressbeesNDRList(): Promise<NDRItem[]> {
 
     const data = await response.json();
     const rawList = data.ndr_list || data.data || [];
-    
+
     return rawList.map((item: any) => ({
       awbNumber: item.awb_number || item.awb || "",
       reason: item.reason || item.failure_reason || "NDR reported",
