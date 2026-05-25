@@ -6,6 +6,7 @@ import CancelOrderModal from "@/components/admin/CancelOrderModal";
 import ShippingDimensionsModal from "@/components/admin/ShippingDimensionsModal";
 import CancelShipmentModal from "@/components/admin/CancelShipmentModal";
 import DowngradeConfirmationModal from "@/components/admin/DowngradeConfirmationModal";
+import NdrActionModal from "@/components/admin/NdrActionModal";
 import { 
   ShoppingBag, 
   Search, 
@@ -24,7 +25,8 @@ import {
   ChevronDown,
   Truck,
   Info,
-  Download
+  Download,
+  AlertTriangle
 } from "lucide-react";
 
 type OrderItem = {
@@ -298,25 +300,29 @@ export default function AdminOrders() {
   const [activeAwbOrderId, setActiveAwbOrderId] = useState<number | null>(null);
   const [activeCancelShipmentId, setActiveCancelShipmentId] = useState<number | null>(null);
   const [activeCancelShipmentAwb, setActiveCancelShipmentAwb] = useState<string | null>(null);
+  const [ndrModalOpen, setNdrModalOpen] = useState(false);
+  const [ndrAwb, setNdrAwb] = useState("");
+  const [ndrRemarks, setNdrRemarks] = useState("");
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, startDate, endDate, statusFilter]);
 
-  useEffect(() => {
-    async function fetchOrders() {
-      try {
-        const res = await fetch("/api/admin/orders");
-        const data = await res.json();
-        if (data.success) {
-          setOrders(data.data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch orders", error);
-      } finally {
-        setLoading(false);
+  async function fetchOrders() {
+    try {
+      const res = await fetch("/api/admin/orders");
+      const data = await res.json();
+      if (data.success) {
+        setOrders(data.data);
       }
+    } catch (error) {
+      console.error("Failed to fetch orders", error);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     fetchOrders();
   }, []);
 
@@ -542,6 +548,20 @@ export default function AdminOrders() {
                       <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest rounded-full ${getStatusBadgeStyle(order.status)}`}>
                         {order.status}
                       </span>
+                      {(() => {
+                        const parsed = (() => {
+                          if (!order.shippingDetails) return null;
+                          try { return JSON.parse(order.shippingDetails); } catch { return null; }
+                        })();
+                        const isNdr = parsed?.isNdr || parsed?.ndrActive || order.shippingStatus === "NDR_ACTION_REQUIRED";
+                        if (!isNdr) return null;
+                        return (
+                          <span className="bg-red-100 text-red-700 border border-red-200 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1 select-none">
+                            <AlertTriangle size={10} className="shrink-0" />
+                            NDR Alert
+                          </span>
+                        );
+                      })()}
                     </div>
                     <p className="text-xs font-medium text-brand/40">
                       Placed on {new Date(order.createdAt).toLocaleString('en-GB', {
@@ -570,6 +590,46 @@ export default function AdminOrders() {
               {/* Expanded Details */}
               {expandedOrder === order.id && (
                 <div className="px-6 pb-6 pt-1 border-t border-brand/5 bg-brand/[0.005] rounded-b-2xl">
+                  {/* NDR Alert Banner */}
+                  {(() => {
+                    const parsed = (() => {
+                      if (!order.shippingDetails) return null;
+                      try { return JSON.parse(order.shippingDetails); } catch { return null; }
+                    })();
+                    const isNdrActive = parsed?.isNdr || parsed?.ndrActive || order.shippingStatus === "NDR_ACTION_REQUIRED";
+                    const ndrReason = parsed?.ndrReason || parsed?.ndrRemarks || "Delivery failed. Action required.";
+
+                    if (!isNdrActive) return null;
+
+                    return (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
+                            <AlertTriangle size={18} className="animate-pulse" />
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-0.5">Non-Delivery Exception Alert</h5>
+                            <p className="text-xs text-amber-800 font-semibold leading-relaxed">
+                              Courier Remark: <span className="italic">"{ndrReason}"</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNdrAwb(order.awbNumber || "");
+                            setNdrRemarks(ndrReason);
+                            setNdrModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all shadow-sm cursor-pointer shrink-0 text-center"
+                        >
+                          Resolve NDR Exception
+                        </button>
+                      </div>
+                    );
+                  })()}
+
                   {/* State Machine Status Header */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-brand/5 p-4 rounded-2xl border border-brand/5 mt-4">
                     <div>
@@ -856,6 +916,18 @@ export default function AdminOrders() {
           }}
           onConfirm={async () => {
             await handleStatusTransition(activeCancelShipmentId, { orderStatus: "CANCELLED" });
+          }}
+        />
+      )}
+
+      {ndrModalOpen && (
+        <NdrActionModal
+          isOpen={true}
+          awbNumber={ndrAwb}
+          courierRemarks={ndrRemarks}
+          onClose={() => setNdrModalOpen(false)}
+          onSuccess={async () => {
+            await fetchOrders();
           }}
         />
       )}

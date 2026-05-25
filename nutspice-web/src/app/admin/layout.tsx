@@ -25,6 +25,7 @@ const sidebarLinks = [
   { name: "Inventory", href: "/admin/inventory", icon: Box },
   { name: "Products", href: "/admin/products", icon: Shirt },
   { name: "Orders", href: "/admin/orders", icon: Package },
+  { name: "NDR", href: "/admin/orders/ndr", icon: AlertTriangle },
   { name: "Navbar Settings", href: "/admin/navigation", icon: Map },
   { name: "Home Banners", href: "/admin/home-banners", icon: Sparkles },
   { name: "Home Tabs", href: "/admin/home-tabs", icon: LayoutDashboard },
