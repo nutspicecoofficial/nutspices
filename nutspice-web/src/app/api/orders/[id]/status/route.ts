@@ -39,7 +39,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { orderStatus, shippingStatus, packageDetails, cancelReason } = body;
+    const { orderStatus, shippingStatus, packageDetails, cancelReason, cancelShipmentOnly } = body;
 
     // Fetch the current order row from SQLite
     const orderRows = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
@@ -47,6 +47,69 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
     const order = orderRows[0];
+
+    // Check if we are doing a cancelShipmentOnly request
+    if (cancelShipmentOnly) {
+      if (!order.awbNumber) {
+        return NextResponse.json({ success: false, error: "No active shipment found to cancel." }, { status: 400 });
+      }
+
+      // 1. Call Xpressbees API. Let errors bubble up to reject state updates
+      await cancelShipment(order.awbNumber);
+
+      // 2. Build the updated shipping details log
+      let currentDetails: any = {};
+      if (order.shippingDetails) {
+        try {
+          currentDetails = JSON.parse(order.shippingDetails);
+        } catch {
+          currentDetails = { raw: order.shippingDetails };
+        }
+      }
+
+      const cancelledHistory = currentDetails.cancelledAwbs || [];
+      cancelledHistory.push({
+        awbNumber: order.awbNumber,
+        labelUrl: currentDetails.labelUrl || currentDetails.label || "",
+        manifestUrl: currentDetails.manifestUrl || "",
+        cancelledAt: new Date().toISOString()
+      });
+
+      const updatedDetails = {
+        ...currentDetails,
+        awbNumber: null,
+        labelUrl: null,
+        label: null,
+        manifestUrl: null,
+        pickupToken: null,
+        scheduledDate: null,
+        pickupRequestedAt: null,
+        isNdr: false,
+        ndrActive: false,
+        cancelledAwbs: cancelledHistory
+      };
+
+      // 3. Update the SQLite database
+      await db
+        .update(orders)
+        .set({
+          orderStatus: "2_PROCESSING",
+          shippingStatus: "PENDING",
+          awbNumber: null,
+          shippingDetails: JSON.stringify(updatedDetails)
+        })
+        .where(eq(orders.id, orderId));
+
+      return NextResponse.json({
+        success: true,
+        message: "Shipment cancelled and order reverted to Processing successfully.",
+        data: {
+          orderStatus: "2_PROCESSING",
+          shippingStatus: "PENDING",
+          awbNumber: null
+        }
+      });
+    }
 
     // Maintain object of all fields to update in the DB
     const updates: Partial<typeof orders.$inferSelect> = {};

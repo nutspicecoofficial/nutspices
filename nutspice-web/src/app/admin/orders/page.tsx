@@ -727,12 +727,36 @@ export default function AdminOrders() {
                           const labelUrl = shippingDetails?.label || shippingDetails?.labelUrl;
                           const manifestUrl = shippingDetails?.manifestUrl;
 
-                          if (!labelUrl && !manifestUrl) return null;
+                          if (!labelUrl && !manifestUrl && !order.awbNumber) return null;
 
                           return (
                             <div>
                               <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping Details & Documents</h4>
-                              <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
+                              <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm relative">
+                                
+                                {/* Cancel Shipment Button with Slide-out Animation & Tooltip */}
+                                {order.awbNumber && order.shippingStatus !== "DELIVERED" && (
+                                  <div className="absolute bottom-4 right-4 group">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveCancelShipmentId(order.id);
+                                        setActiveCancelShipmentAwb(order.awbNumber || null);
+                                      }}
+                                      className="flex items-center gap-0 hover:gap-2 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all duration-300 ease-out cursor-pointer overflow-hidden max-w-[34px] hover:max-w-[150px] group/btn shadow-xs"
+                                    >
+                                      <span className="text-[9px] font-black uppercase tracking-wider text-rose-600 opacity-0 group-hover/btn:opacity-100 max-w-0 group-hover/btn:max-w-[100px] transition-all duration-300 ease-out overflow-hidden whitespace-nowrap">
+                                        Cancel Shipment
+                                      </span>
+                                      <XCircle size={16} className="shrink-0" />
+                                    </button>
+                                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-[#1B3022] text-white text-[10px] normal-case tracking-normal font-medium rounded-lg shadow-lg z-30 pointer-events-none text-center leading-relaxed">
+                                      Cancel this Xpressbees shipment. Order will return to Processing state.
+                                      <div className="absolute top-full right-3 w-1.5 h-1.5 bg-[#1B3022] rotate-45 -translate-y-0.5"></div>
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 <FileText size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
                                 <div className="min-w-0 flex-1">
                                   {/* Grid Content */}
@@ -915,7 +939,18 @@ export default function AdminOrders() {
             setActiveCancelShipmentAwb(null);
           }}
           onConfirm={async () => {
-            await handleStatusTransition(activeCancelShipmentId, { orderStatus: "CANCELLED" });
+            const res = await fetch(`/api/orders/${activeCancelShipmentId}/status`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                cancelShipmentOnly: true
+              })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              throw new Error(data.error || "Failed to cancel shipment.");
+            }
+            await fetchOrders();
           }}
         />
       )}

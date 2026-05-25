@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PaymentDetailsCard from "@/components/admin/PaymentDetailsCard";
 import NdrActionModal from "@/components/admin/NdrActionModal";
+import CancelShipmentModal from "@/components/admin/CancelShipmentModal";
 import { 
   ArrowLeft, 
   Clock, 
@@ -15,7 +16,8 @@ import {
   Download,
   AlertTriangle,
   ChevronDown,
-  Info
+  Info,
+  XCircle
 } from "lucide-react";
 
 interface OrderItem {
@@ -59,6 +61,22 @@ export default function OrderDetailClient({
 }: OrderDetailClientProps) {
   const router = useRouter();
   const [ndrModalOpen, setNdrModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
+  const handleCancelShipment = async () => {
+    const res = await fetch(`/api/orders/${order.id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cancelShipmentOnly: true
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to cancel shipment.");
+    }
+    router.refresh();
+  };
 
   // Parse shipping details
   const parsedShippingDetails = (() => {
@@ -253,10 +271,30 @@ export default function OrderDetailClient({
           </div>
 
           {/* Shipping details and documents */}
-          {(parsedShippingDetails?.invoiceNumber || labelUrl || manifestUrl) && (
+          {(parsedShippingDetails?.invoiceNumber || labelUrl || manifestUrl || order.awbNumber) && (
             <div>
               <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping details & Documents</h4>
-              <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs">
+              <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs relative">
+                
+                {/* Cancel Shipment Button with Slide-out Animation & Tooltip */}
+                {order.awbNumber && order.shippingStatus !== "DELIVERED" && (
+                  <div className="absolute bottom-5 right-5 group">
+                    <button
+                      type="button"
+                      onClick={() => setCancelModalOpen(true)}
+                      className="flex items-center gap-0 hover:gap-2 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all duration-300 ease-out cursor-pointer overflow-hidden max-w-[34px] hover:max-w-[150px] group/btn shadow-xs"
+                    >
+                      <span className="text-[9px] font-black uppercase tracking-wider text-rose-600 opacity-0 group-hover/btn:opacity-100 max-w-0 group-hover/btn:max-w-[100px] transition-all duration-300 ease-out overflow-hidden whitespace-nowrap">
+                        Cancel Shipment
+                      </span>
+                      <XCircle size={16} className="shrink-0" />
+                    </button>
+                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-[#1B3022] text-white text-[10px] normal-case tracking-normal font-medium rounded-lg shadow-lg z-35 pointer-events-none text-center leading-relaxed">
+                      Cancel this Xpressbees shipment. Order will return to Processing state.
+                      <div className="absolute top-full right-3 w-1.5 h-1.5 bg-[#1B3022] rotate-45 -translate-y-0.5"></div>
+                    </div>
+                  </div>
+                )}
                 <FileText size={18} className="text-[#C5A059] shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
@@ -350,6 +388,17 @@ export default function OrderDetailClient({
           courierRemarks={ndrReason}
           onClose={() => setNdrModalOpen(false)}
           onSuccess={handleNdrSuccess}
+        />
+      )}
+
+      {/* Cancel Shipment Modal Trigger */}
+      {cancelModalOpen && (
+        <CancelShipmentModal
+          isOpen={true}
+          orderId={order.id}
+          awbNumber={order.awbNumber || ""}
+          onClose={() => setCancelModalOpen(false)}
+          onConfirm={handleCancelShipment}
         />
       )}
     </div>
