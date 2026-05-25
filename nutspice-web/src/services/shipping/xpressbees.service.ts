@@ -308,31 +308,49 @@ export async function requestPickupXpressbees(awbNumbers: string[]): Promise<Pic
   try {
     const token = await getXpressbeesToken();
 
-    const response = await fetch(`${getApiUrl()}/franchise/pickups`, {
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/pickup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        awb_numbers: awbNumbers
+        awb_numbers: awbNumbers.join(",")
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Pickup scheduling failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `Pickup scheduling failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    const pickupToken = data.pickup_token || data.token || data.data?.pickup_token || "PKUP" + Math.floor(100000 + Math.random() * 900000);
+    if (data.response !== true) {
+      throw new Error(data.message || `Pickup scheduling failed: ${JSON.stringify(data)}`);
+    }
+
+    const pickupToken = "PKUP" + Math.floor(100000 + Math.random() * 900000);
 
     return {
       success: true,
       pickupToken: pickupToken,
-      scheduledDate: data.scheduled_date || data.data?.scheduled_date || new Date(Date.now() + 86400000).toISOString().split("T")[0],
+      scheduledDate: new Date().toISOString().split("T")[0],
       status: "4_PICKUP_REQUESTED",
-      message: data.message || data.data?.message || `Pickup scheduled successfully under token ${pickupToken}`
+      message: data.message || "Pickup manifest generated successfully.",
+      manifestUrl: data.data
     };
   } catch (error: any) {
     console.error("Xpressbees request pickup error:", error);

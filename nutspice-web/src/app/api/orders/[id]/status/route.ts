@@ -164,6 +164,7 @@ export async function PATCH(
         pickupToken: pickupRes.pickupToken,
         scheduledDate: pickupRes.scheduledDate,
         pickupMessage: pickupRes.message,
+        manifestUrl: pickupRes.manifestUrl || currentDetails.manifestUrl || "",
         pickupRequestedAt: new Date().toISOString()
       });
     } 

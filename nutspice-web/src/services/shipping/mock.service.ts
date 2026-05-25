@@ -36,6 +36,7 @@ export interface PickupResponse {
   scheduledDate: string;
   status: string;
   message: string;
+  manifestUrl?: string;
 }
 
 export interface CourierService {
