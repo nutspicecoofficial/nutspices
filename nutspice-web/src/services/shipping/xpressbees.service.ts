@@ -281,7 +281,7 @@ export async function generateShipmentXpressbees(
       breadth: String(width),
       height: String(height),
       courier_id: String(packageDetails?.courierId || "01"),
-      pickup_location: "franchise",
+      pickup_location: "customer",
       shipping_charges: String(order.shippingCharges || 0),
       cod_charges: String(order.codCharges || 0),
       discount: String(order.discount || 0),
@@ -454,8 +454,8 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
       status: item.status || item.ship_status || "IN_TRANSIT",
       location: item.location || "Transit Hub",
       message: item.message || "Shipment activity recorded.",
-      timestamp: item.event_time 
-        ? new Date(parseInt(item.event_time) * 1000).toISOString() 
+      timestamp: item.event_time
+        ? new Date(parseInt(item.event_time) * 1000).toISOString()
         : new Date().toISOString()
     }));
 
