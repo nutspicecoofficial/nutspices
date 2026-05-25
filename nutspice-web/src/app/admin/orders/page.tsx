@@ -23,7 +23,8 @@ import {
   FileText,
   ChevronDown,
   Truck,
-  Info
+  Info,
+  Download
 } from "lucide-react";
 
 type OrderItem = {
@@ -78,7 +79,7 @@ interface FulfillmentActionsPanelProps {
   setActiveCancelShipmentAwb: (awb: string | null) => void;
 }
 
-const statusHierarchy = ['0_PLACED', '1_CONFIRMED', '2_PROCESSING', '3_AWB_GENERATED', 'DELIVERED', 'CANCELLED'];
+const statusHierarchy = ['0_PLACED', '1_CONFIRMED', '2_PROCESSING', '3_AWB_GENERATED', '4_PICKUP_REQUESTED', 'DELIVERED', 'CANCELLED'];
 
 const getCurrentStatusKey = (o: Order): string => {
   if (o.orderStatus === "CANCELLED" || (o.status || "").toLowerCase() === "cancelled") {
@@ -87,7 +88,10 @@ const getCurrentStatusKey = (o: Order): string => {
   if (o.shippingStatus === "DELIVERED" || (o.status || "").toLowerCase() === "delivered") {
     return "DELIVERED";
   }
-  if (o.shippingStatus === "3_AWB_GENERATED" || o.shippingStatus === "4_PICKUP_REQUESTED" || (o.shippingStatus || "").startsWith("3_") || (o.shippingStatus || "").startsWith("4_") || o.awbNumber) {
+  if (o.shippingStatus === "4_PICKUP_REQUESTED" || (o.shippingStatus || "").startsWith("4_")) {
+    return "4_PICKUP_REQUESTED";
+  }
+  if (o.shippingStatus === "3_AWB_GENERATED" || (o.shippingStatus || "").startsWith("3_") || o.awbNumber) {
     return "3_AWB_GENERATED";
   }
   return o.orderStatus || "0_PLACED";
@@ -126,6 +130,11 @@ function FulfillmentActionsPanel({
       id: "3_AWB_GENERATED",
       label: "3_AWB_GENERATED (AWB Generated)",
       tooltipText: "Book shipping consignment and generate courier Airway Bill (AWB)."
+    },
+    {
+      id: "4_PICKUP_REQUESTED",
+      label: "4_PICKUP_REQUESTED (Request Pickup)",
+      tooltipText: "Schedule shipping consignment pickup from the warehouse."
     },
     {
       id: "DELIVERED",
@@ -170,6 +179,9 @@ function FulfillmentActionsPanel({
         break;
       case "3_AWB_GENERATED":
         setActiveAwbOrderId(order.id);
+        break;
+      case "4_PICKUP_REQUESTED":
+        await onStatusTransition(order.id, { shippingStatus: "4_PICKUP_REQUESTED" });
         break;
       case "DELIVERED":
         await onStatusTransition(order.id, { shippingStatus: "DELIVERED" });
@@ -623,23 +635,87 @@ export default function AdminOrders() {
                     </div>
                     
                     <div className="flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Delivery Address</h4>
-                        <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
-                          <MapPin size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
-                          <div className="min-w-0 flex-1">
-                            {/* Scrollable & Wrapping Address Container */}
-                            <div className="max-h-24 overflow-y-auto pr-2 custom-scrollbar">
-                              <p className="text-xs text-brand font-medium leading-relaxed italic break-words">
-                                "{order.shippingAddress}"
-                              </p>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-brand/5">
-                              <p className="text-[8px] font-black text-brand/30 uppercase tracking-widest mb-0.5">Customer Phone</p>
-                              <p className="text-xs text-brand font-bold">{order.customerPhone}</p>
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Delivery Address</h4>
+                          <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
+                            <MapPin size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
+                            <div className="min-w-0 flex-1">
+                              {/* Scrollable & Wrapping Address Container */}
+                              <div className="max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                                <p className="text-xs text-brand font-medium leading-relaxed italic break-words">
+                                  "{order.shippingAddress}"
+                                </p>
+                              </div>
+                              <div className="mt-3 pt-3 border-t border-brand/5">
+                                <p className="text-[8px] font-black text-brand/30 uppercase tracking-widest mb-0.5">Customer Phone</p>
+                                <p className="text-xs text-brand font-bold">{order.customerPhone}</p>
+                              </div>
                             </div>
                           </div>
                         </div>
+
+                        {(() => {
+                          let shippingDetails: any = null;
+                          if (order.shippingDetails) {
+                            try {
+                              shippingDetails = JSON.parse(order.shippingDetails);
+                            } catch (e) {
+                              console.error("Failed to parse shipping details:", e);
+                            }
+                          }
+                          const labelUrl = shippingDetails?.label || shippingDetails?.labelUrl;
+                          const manifestUrl = shippingDetails?.manifestUrl;
+
+                          if (!labelUrl && !manifestUrl) return null;
+
+                          return (
+                            <div>
+                              <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping Documents</h4>
+                              <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
+                                <FileText size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap gap-4 pt-1">
+                                    {labelUrl && (
+                                      <div className="relative group">
+                                        <a
+                                          href={labelUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors shadow-sm cursor-pointer"
+                                        >
+                                          <Download size={16} />
+                                          Order Label
+                                        </a>
+                                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
+                                          Download the PDF shipping label. Print and attach this securely to the package.
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {manifestUrl && (
+                                      <div className="relative group">
+                                        <a
+                                          href={manifestUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors shadow-sm cursor-pointer"
+                                        >
+                                          <Download size={16} />
+                                          View Manifest
+                                        </a>
+                                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50 text-center">
+                                          Download the pickup manifest PDF. The courier agent must sign this upon package handover.
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Action buttons progression panel */}

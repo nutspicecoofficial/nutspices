@@ -138,6 +138,7 @@ export async function requestPickup(pickupData: any): Promise<PickupResponse> {
     scheduledDate: pickupData?.pickupDate || new Date(Date.now() + 86400000).toISOString().split("T")[0],
     status: "4_PICKUP_REQUESTED",
     message: "Pickup scheduled successfully under token " + token,
+    manifestUrl: "https://www.rd.usda.gov/sites/default/files/pdf-sample_0.pdf"
   };
 }
 
