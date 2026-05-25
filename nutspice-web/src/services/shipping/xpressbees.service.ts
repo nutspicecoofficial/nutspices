@@ -142,19 +142,42 @@ export async function getXpressbeesToken(): Promise<string> {
 /**
  * Retrieves the list of available couriers from Xpressbees.
  */
-export async function getCouriersXpressbees(): Promise<any[]> {
+export async function getCouriersXpressbees(payload?: any): Promise<any[]> {
   try {
     const token = await getXpressbeesToken();
 
-    const response = await fetch(`${getApiUrl()}/franchise/shipments/courier`, {
-      method: "GET",
+    // Prepare payload fields with safe defaults
+    const weight = payload?.weight !== undefined ? String(payload.weight) : "0.5";
+    const length = payload?.length !== undefined ? String(payload.length) : "10";
+    const height = payload?.height !== undefined ? String(payload.height) : "10";
+    const breadth = payload?.width !== undefined ? String(payload.width) : (payload?.breadth !== undefined ? String(payload.breadth) : "10");
+    const destination = payload?.destination || "110001";
+    const cod = payload?.cod === "yes" || payload?.cod === "COD" || payload?.cod === "yes/no" ? "yes" : "no";
+    const codAmount = payload?.cod_amount !== undefined ? String(payload.cod_amount) : "0";
+
+    const apiBody = {
+      order_type_user: "ecom",
+      origin: CONSIGNER_DATA.consigner_pincode || "122002",
+      destination: destination,
+      weight: weight,
+      length: length,
+      height: height,
+      breadth: breadth,
+      cod_amount: codAmount,
+      cod: cod
+    };
+
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/calculate_pricing`, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify(apiBody)
     });
 
     if (!response.ok) {
-      let errorMessage = `Courier list request failed with status ${response.status}`;
+      let errorMessage = `Calculate pricing failed with status ${response.status}`;
       try {
         const errorJson = await response.json();
         if (errorJson && typeof errorJson.message === "string") {
@@ -173,13 +196,26 @@ export async function getCouriersXpressbees(): Promise<any[]> {
 
     const data = await response.json();
     if (data.status !== true) {
-      throw new Error(data.message || `Failed to fetch courier list: ${JSON.stringify(data)}`);
+      throw new Error(data.message || `Pricing calculation failed: ${JSON.stringify(data)}`);
     }
 
-    return data.data || [];
+    const rawCouriers = Array.isArray(data.message) ? data.message : [];
+
+    // Map Xpressbees rates array to the CourierService model expected by front-end
+    return rawCouriers.map((item: any) => {
+      const name = item.name || "Xpressbees Courier";
+      const isExpress = name.toLowerCase().includes("air") || name.toLowerCase().includes("express");
+      return {
+        id: name.toLowerCase().replace(/\s+/g, "_"),
+        name: name,
+        charge: typeof item.total_price === "number" ? item.total_price : parseFloat(item.total_price || "0"),
+        estimatedDays: isExpress ? 2 : 5,
+        rating: isExpress ? 4.8 : 4.3
+      };
+    });
   } catch (error: any) {
-    console.error("Xpressbees get couriers error:", error);
-    throw new Error(`Xpressbees Get Couriers Failure: ${error.message}`);
+    console.error("Xpressbees calculate pricing error:", error);
+    throw new Error(`Xpressbees Calculate Pricing Failure: ${error.message}`);
   }
 }
 
@@ -452,7 +488,7 @@ export async function cancelShipmentXpressbees(awbNumber: string): Promise<Cance
   try {
     const token = await getXpressbeesToken();
 
-    const response = await fetch(`${getApiUrl()}/franchise/shipments/cancel`, {
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/cancel_shipment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -464,16 +500,33 @@ export async function cancelShipmentXpressbees(awbNumber: string): Promise<Cance
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Cancellation failed with status ${response.status}: ${errorText}`);
+      let errorMessage = `Cancellation failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
+    if (data.response !== true) {
+      throw new Error(data.message || `Cancellation failed: ${JSON.stringify(data)}`);
+    }
+
     return {
       success: true,
       awbNumber,
       status: "SHIPMENT_CANCELLED",
-      message: data.message || data.data?.message || `Shipment for AWB ${awbNumber} has been successfully cancelled in Xpressbees.`
+      message: data.message || `Shipment for AWB ${awbNumber} has been successfully cancelled in Xpressbees.`
     };
   } catch (error: any) {
     console.error("Xpressbees cancellation error:", error);

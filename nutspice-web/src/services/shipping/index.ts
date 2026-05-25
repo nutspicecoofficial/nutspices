@@ -55,7 +55,7 @@ export async function getCouriers(payload: any) {
   if (USE_MOCK) {
     return mockService.getCouriers(payload);
   }
-  return xpressbeesService.getCouriersXpressbees();
+  return xpressbeesService.getCouriersXpressbees(payload);
 }
 
 /**
