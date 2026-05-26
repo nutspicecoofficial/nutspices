@@ -27,7 +27,7 @@ interface ShippingDimensionsModalProps {
     courierId: string
   ) => Promise<void>;
   orderId: number;
-  order?: any;
+  order?: { createdAt?: string | Date };
 }
 
 const formatDateForInput = (dateStrOrObj: string | Date): string => {
@@ -51,23 +51,15 @@ export default function ShippingDimensionsModal({
   const [length, setLength] = useState("10");
   const [breadth, setBreadth] = useState("10"); // Breadth maps to width
   const [height, setHeight] = useState("10");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState(() => `NS-INV-${orderId}`);
+  const [invoiceDate, setInvoiceDate] = useState(() => formatDateForInput(new Date()));
   const [selectedCourier, setSelectedCourier] = useState("");
   const [couriers, setCouriers] = useState<CourierService[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize invoice fields when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setInvoiceNumber(`NS-INV-${orderId}`);
-      setInvoiceDate(formatDateForInput(new Date()));
-    }
-  }, [orderId, isOpen]);
-
-  // Dynamically fetch couriers and rates when dimensions change
+  // Fetch couriers once when the modal opens
   useEffect(() => {
     if (!isOpen) return;
 
@@ -97,7 +89,7 @@ export default function ShippingDimensionsModal({
         } else {
           throw new Error(result.error || "Failed to load couriers.");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         setError("Error loading live shipping rates. Please verify inputs.");
       } finally {
@@ -105,12 +97,9 @@ export default function ShippingDimensionsModal({
       }
     };
 
-    const debounceTimer = setTimeout(() => {
-      fetchCouriers();
-    }, 450);
-
-    return () => clearTimeout(debounceTimer);
-  }, [weight, length, breadth, height, isOpen]);
+    fetchCouriers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -157,8 +146,8 @@ export default function ShippingDimensionsModal({
         selectedCourier
       );
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to generate shipment.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate shipment.");
     } finally {
       setIsSubmitting(false);
     }

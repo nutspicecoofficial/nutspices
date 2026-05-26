@@ -61,13 +61,15 @@ export async function PATCH(
       let currentDetails: any = {};
       if (order.shippingDetails) {
         try {
-          currentDetails = JSON.parse(order.shippingDetails);
+          currentDetails = typeof order.shippingDetails === "string"
+            ? JSON.parse(order.shippingDetails)
+            : order.shippingDetails;
         } catch {
           currentDetails = { raw: order.shippingDetails };
         }
       }
 
-      const cancelledHistory = currentDetails.cancelledAwbs || [];
+      const cancelledHistory = [...(currentDetails.cancelledAwbs || [])];
       cancelledHistory.push({
         awbNumber: order.awbNumber,
         labelUrl: currentDetails.labelUrl || currentDetails.label || "",
@@ -179,10 +181,19 @@ export async function PATCH(
         throw new Error("Shipment generation adapter returned failure status.");
       }
 
-      updates.awbNumber = shipmentRes.awbNumber;
-      updates.shippingStatus = "3_AWB_GENERATED";
-      updates.status = "Shipped";
-      updates.shippingDetails = JSON.stringify({
+      let currentDetails: any = {};
+      if (order.shippingDetails) {
+        try {
+          currentDetails = typeof order.shippingDetails === "string"
+            ? JSON.parse(order.shippingDetails)
+            : order.shippingDetails;
+        } catch {
+          currentDetails = { raw: order.shippingDetails };
+        }
+      }
+
+      const mergedDetails = {
+        ...currentDetails,
         courierName: shipmentRes.courierName || "Xpressbees",
         labelUrl: shipmentRes.labelUrl || "",
         estimatedDelivery: shipmentRes.estimatedDelivery || "",
@@ -194,7 +205,12 @@ export async function PATCH(
         invoiceNumber: packageDetails?.invoiceNumber || null,
         invoiceDate: packageDetails?.invoiceDate || null,
         courierId: packageDetails?.courierId || null
-      });
+      };
+
+      updates.awbNumber = shipmentRes.awbNumber;
+      updates.shippingStatus = "3_AWB_GENERATED";
+      updates.status = "Shipped";
+      updates.shippingDetails = JSON.stringify(mergedDetails);
     } 
     // 4. Trigger Pickup Booking (4_PICKUP_REQUESTED)
     else if (shippingStatus === "4_PICKUP_REQUESTED") {
@@ -243,7 +259,24 @@ export async function PATCH(
       updates.shippingStatus = shippingStatus;
       if (shippingStatus === "PENDING") {
         updates.awbNumber = null;
-        updates.shippingDetails = null;
+        let currentDetails: any = {};
+        if (order.shippingDetails) {
+          try {
+            currentDetails = typeof order.shippingDetails === "string"
+              ? JSON.parse(order.shippingDetails)
+              : order.shippingDetails;
+          } catch {
+            currentDetails = null;
+          }
+        }
+        if (currentDetails && Array.isArray(currentDetails.cancelledAwbs)) {
+          updates.shippingDetails = JSON.stringify({
+            cancelledAwbs: currentDetails.cancelledAwbs
+          });
+        } else {
+          updates.shippingDetails = null;
+        }
+
         if (order.awbNumber) {
           try {
             await cancelShipment(order.awbNumber);

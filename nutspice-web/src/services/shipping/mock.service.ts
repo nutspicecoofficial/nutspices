@@ -16,7 +16,7 @@ export interface TrackingResponse {
   status: string;
   carrier: string;
   history: TrackingActivity[];
-  trackingData?: any;
+  trackingData?: Record<string, unknown>;
 }
 
 export interface ShipmentResponse {
@@ -115,7 +115,7 @@ export async function trackShipment(awbNumber: string): Promise<TrackingResponse
 /**
  * Generate a new shipment and allocate AWB.
  */
-export async function generateShipment(orderData: any): Promise<ShipmentResponse> {
+export async function generateShipment(_orderData: unknown): Promise<ShipmentResponse> {
   const mockAwb = "XB" + Math.floor(1000000000 + Math.random() * 9000000000);
   return {
     success: true,
@@ -130,12 +130,13 @@ export async function generateShipment(orderData: any): Promise<ShipmentResponse
 /**
  * Schedule/Request a shipment pickup.
  */
-export async function requestPickup(pickupData: any): Promise<PickupResponse> {
+export async function requestPickup(pickupData: unknown): Promise<PickupResponse> {
+  const pData = pickupData as { pickupDate?: string } | undefined;
   const token = "PKUP" + Math.floor(100000 + Math.random() * 900000);
   return {
     success: true,
     pickupToken: token,
-    scheduledDate: pickupData?.pickupDate || new Date(Date.now() + 86400000).toISOString().split("T")[0],
+    scheduledDate: pData?.pickupDate || new Date(Date.now() + 86400000).toISOString().split("T")[0],
     status: "4_PICKUP_REQUESTED",
     message: "Pickup scheduled successfully under token " + token,
     manifestUrl: "https://www.rd.usda.gov/sites/default/files/pdf-sample_0.pdf"
@@ -145,7 +146,7 @@ export async function requestPickup(pickupData: any): Promise<PickupResponse> {
 /**
  * Retrieve a list of available couriers and rates.
  */
-export async function getCouriers(payload: any): Promise<CourierService[]> {
+export async function getCouriers(_payload: unknown): Promise<CourierService[]> {
   return [
     {
       id: "xb_surface",
@@ -208,11 +209,12 @@ export async function getNDRList(): Promise<NDRItem[]> {
 /**
  * Create or respond to an NDR action.
  */
-export async function createNDR(ndrData: any): Promise<NDRResponse> {
+export async function createNDR(ndrData: unknown): Promise<NDRResponse> {
+  const nData = ndrData as { awbNumber?: string; action?: string } | undefined;
   return {
     success: true,
-    awbNumber: ndrData?.awbNumber || "XB5584930291",
-    action: ndrData?.action || "REATTEMPT",
-    message: `NDR resolution instruction '${ndrData?.action || "REATTEMPT"}' received and submitted to courier.`,
+    awbNumber: nData?.awbNumber || "XB5584930291",
+    action: nData?.action || "REATTEMPT",
+    message: `NDR resolution instruction '${nData?.action || "REATTEMPT"}' received and submitted to courier.`,
   };
 }

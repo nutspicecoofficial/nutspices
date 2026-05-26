@@ -24,38 +24,46 @@ export async function trackShipment(awbNumber: string) {
 /**
  * Generates/registers a shipment with the courier and retrieves an AWB.
  */
-export async function generateShipment(orderData: any) {
+export async function generateShipment(orderData: unknown) {
   if (USE_MOCK) {
     return mockService.generateShipment(orderData);
   }
+  const data = orderData as {
+    order?: unknown;
+    items?: unknown[];
+    packageDetails?: unknown;
+  };
   return xpressbeesService.generateShipmentXpressbees(
-    orderData.order || orderData,
-    orderData.items || [],
-    orderData.packageDetails || {}
+    (data.order || data) as xpressbeesService.XpressbeesOrder,
+    (data.items || []) as xpressbeesService.XpressbeesItem[],
+    (data.packageDetails || {}) as xpressbeesService.XpressbeesPackageDetails
   );
 }
 
 /**
  * Requests/schedules shipment pickup from the warehouse.
  */
-export async function requestPickup(pickupData: any) {
+export async function requestPickup(pickupData: unknown) {
   if (USE_MOCK) {
     return mockService.requestPickup(pickupData);
   }
-  const awbs = Array.isArray(pickupData)
-    ? pickupData
-    : pickupData.awbNumbers || [pickupData.awbNumber || pickupData];
+  const data = pickupData as { awbNumbers?: string[]; awbNumber?: string } | string | string[];
+  const awbs = Array.isArray(data)
+    ? data
+    : typeof data === "object" && data !== null
+    ? data.awbNumbers || [data.awbNumber || ""]
+    : [String(data)];
   return xpressbeesService.requestPickupXpressbees(awbs);
 }
 
 /**
  * Retrieves a list of available couriers and calculated charges.
  */
-export async function getCouriers(payload: any) {
+export async function getCouriers(payload: unknown) {
   if (USE_MOCK) {
     return mockService.getCouriers(payload);
   }
-  return xpressbeesService.getCouriersXpressbees(payload);
+  return xpressbeesService.getCouriersXpressbees();
 }
 
 /**
@@ -81,9 +89,9 @@ export async function getNDRList() {
 /**
  * Creates or responds to a Non-Delivery Report (NDR) instructions/reattempts.
  */
-export async function createNDR(ndrData: any) {
+export async function createNDR(ndrData: unknown) {
   if (USE_MOCK) {
     return mockService.createNDR(ndrData);
   }
-  return xpressbeesService.createXpressbeesNDR(ndrData);
+  return xpressbeesService.createXpressbeesNDR(ndrData as xpressbeesService.XpressbeesNDRPayload);
 }

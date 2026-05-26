@@ -333,7 +333,8 @@ export default function AdminOrders() {
       shippingStatus?: string;
       packageDetails?: any;
       cancelReason?: string;
-    }
+    },
+    throwOnError = false
   ) => {
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -358,11 +359,19 @@ export default function AdminOrders() {
           )
         );
       } else {
-        alert(data.error || "Failed to update order status.");
+        if (throwOnError) {
+          throw new Error(data.error || "Failed to update order status.");
+        } else {
+          alert(data.error || "Failed to update order status.");
+        }
       }
     } catch (e: any) {
       console.error(e);
-      alert("Failed to submit status transition.");
+      if (throwOnError) {
+        throw e;
+      } else {
+        alert("Failed to submit status transition.");
+      }
     }
   };
 
@@ -919,12 +928,13 @@ export default function AdminOrders() {
 
       {activeAwbOrderId !== null && (
         <ShippingDimensionsModal
+          key={activeAwbOrderId}
           isOpen={true}
           orderId={activeAwbOrderId}
           order={orders.find(o => o.id === activeAwbOrderId)}
           onClose={() => setActiveAwbOrderId(null)}
           onConfirm={async (dimensions) => {
-            await handleStatusTransition(activeAwbOrderId, { shippingStatus: "3_AWB_GENERATED", packageDetails: dimensions });
+            await handleStatusTransition(activeAwbOrderId, { shippingStatus: "3_AWB_GENERATED", packageDetails: dimensions }, true);
           }}
         />
       )}

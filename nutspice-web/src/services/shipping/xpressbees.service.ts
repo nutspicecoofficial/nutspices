@@ -11,8 +11,76 @@ import {
   PickupResponse,
   CancellationResponse,
   NDRItem,
-  NDRResponse
+  NDRResponse,
+  CourierService
 } from "./mock.service";
+
+export interface XpressbeesOrder {
+  customerName?: string;
+  fullName?: string;
+  name?: string;
+  customerPhone?: string;
+  phoneNumber?: string;
+  phone?: string;
+  shippingAddress?: string;
+  address?: string;
+  paymentMode?: string;
+  payment_method?: string;
+  totalAmount?: number;
+  amount?: number;
+  consigneeGst?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  shippingCharges?: number;
+  codCharges?: number;
+  discount?: number;
+  id?: number;
+  orderId?: string | number;
+  shippingDetails?: string | Record<string, unknown> | null;
+}
+
+export interface XpressbeesItem {
+  productName?: string;
+  name?: string;
+  quantity?: number;
+  qty?: number;
+  price?: number;
+  sku?: string;
+  productSku?: string;
+}
+
+export interface XpressbeesPackageDetails {
+  weight?: number;
+  length?: number;
+  width?: number;
+  breadth?: number;
+  height?: number;
+  courierId?: string | number;
+}
+
+export interface XpressbeesTrackingActivity {
+  status?: string;
+  ship_status?: string;
+  location?: string;
+  message?: string;
+  event_time?: string;
+}
+
+export interface XpressbeesNDRPayload {
+  awb?: string;
+  awbNumber?: string;
+  action?: string;
+  actionData?: Record<string, unknown>;
+  action_data?: Record<string, unknown>;
+  reAttemptDate?: string;
+  re_attempt_date?: string;
+  remarks?: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 const getApiUrl = () => process.env.XPRESSBEES_API_URL || "https://ship.xpressbees.com/api";
 
@@ -133,51 +201,28 @@ export async function getXpressbeesToken(): Promise<string> {
     // Cache for 55 minutes
     tokenExpiryTime = Date.now() + 55 * 60 * 1000;
     return cachedToken as string;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees authentication failed:", error);
-    throw new Error(`Xpressbees Authentication Failure: ${error.message}`);
+    throw new Error(`Xpressbees Authentication Failure: ${getErrorMessage(error)}`);
   }
 }
 
 /**
  * Retrieves the list of available couriers from Xpressbees.
  */
-export async function getCouriersXpressbees(payload?: any): Promise<any[]> {
+export async function getCouriersXpressbees(): Promise<CourierService[]> {
   try {
     const token = await getXpressbeesToken();
 
-    // Prepare payload fields with safe defaults
-    const weight = payload?.weight !== undefined ? String(payload.weight) : "0.5";
-    const length = payload?.length !== undefined ? String(payload.length) : "10";
-    const height = payload?.height !== undefined ? String(payload.height) : "10";
-    const breadth = payload?.width !== undefined ? String(payload.width) : (payload?.breadth !== undefined ? String(payload.breadth) : "10");
-    const destination = payload?.destination || "110001";
-    const cod = payload?.cod === "yes" || payload?.cod === "COD" || payload?.cod === "yes/no" ? "yes" : "no";
-    const codAmount = payload?.cod_amount !== undefined ? String(payload.cod_amount) : "0";
-
-    const apiBody = {
-      order_type_user: "ecom",
-      origin: CONSIGNER_DATA.consigner_pincode || "122002",
-      destination: destination,
-      weight: weight,
-      length: length,
-      height: height,
-      breadth: breadth,
-      cod_amount: codAmount,
-      cod: cod
-    };
-
-    const response = await fetch(`${getApiUrl()}/franchise/shipments/calculate_pricing`, {
-      method: "POST",
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/courier`, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(apiBody)
+      }
     });
 
     if (!response.ok) {
-      let errorMessage = `Calculate pricing failed with status ${response.status}`;
+      let errorMessage = `Courier list request failed with status ${response.status}`;
       try {
         const errorJson = await response.json();
         if (errorJson && typeof errorJson.message === "string") {
@@ -196,26 +241,26 @@ export async function getCouriersXpressbees(payload?: any): Promise<any[]> {
 
     const data = await response.json();
     if (data.status !== true) {
-      throw new Error(data.message || `Pricing calculation failed: ${JSON.stringify(data)}`);
+      throw new Error(data.message || `Failed to fetch courier list: ${JSON.stringify(data)}`);
     }
 
-    const rawCouriers = Array.isArray(data.message) ? data.message : [];
+    const rawCouriers = Array.isArray(data.data) ? data.data : [];
 
-    // Map Xpressbees rates array to the CourierService model expected by front-end
-    return rawCouriers.map((item: any) => {
+    // Map real Xpressbees courier array to the CourierService model expected by front-end
+    return rawCouriers.map((item: { id?: string; name?: string }) => {
       const name = item.name || "Xpressbees Courier";
       const isExpress = name.toLowerCase().includes("air") || name.toLowerCase().includes("express");
       return {
-        id: name.toLowerCase().replace(/\s+/g, "_"),
+        id: item.id || name.toLowerCase().replace(/\s+/g, "_"),
         name: name,
-        charge: typeof item.total_price === "number" ? item.total_price : parseFloat(item.total_price || "0"),
+        charge: isExpress ? 110.0 : 65.0, // default fallback rates to keep checkout stable
         estimatedDays: isExpress ? 2 : 5,
         rating: isExpress ? 4.8 : 4.3
       };
     });
-  } catch (error: any) {
-    console.error("Xpressbees calculate pricing error:", error);
-    throw new Error(`Xpressbees Calculate Pricing Failure: ${error.message}`);
+  } catch (error: unknown) {
+    console.error("Xpressbees get couriers error:", error);
+    throw new Error(`Xpressbees Get Couriers Failure: ${getErrorMessage(error)}`);
   }
 }
 
@@ -224,9 +269,9 @@ export async function getCouriersXpressbees(payload?: any): Promise<any[]> {
  * Maps internal database data to the Xpressbees /franchise/shipments POST payload.
  */
 export async function generateShipmentXpressbees(
-  order: any,
-  items: any[],
-  packageDetails: any
+  order: XpressbeesOrder,
+  items: XpressbeesItem[],
+  packageDetails: XpressbeesPackageDetails
 ): Promise<ShipmentResponse> {
   try {
     const token = await getXpressbeesToken();
@@ -246,8 +291,27 @@ export async function generateShipmentXpressbees(
     const paymentMode = order.paymentMode || order.payment_method || "prepaid";
     const totalAmount = order.totalAmount || order.amount || 0;
 
+    // Safely parse shippingDetails to determine if AWB was cancelled and calculate retryCount
+    let retryCount = 0;
+    if (order.shippingDetails) {
+      try {
+        const parsed = typeof order.shippingDetails === "string"
+          ? JSON.parse(order.shippingDetails)
+          : order.shippingDetails;
+        if (parsed && Array.isArray(parsed.cancelledAwbs)) {
+          retryCount = parsed.cancelledAwbs.length;
+        }
+      } catch (e) {
+        console.error("Failed to parse shippingDetails inside generateShipmentXpressbees:", e);
+      }
+    }
+
+    const uniqueShipmentId = retryCount > 0
+      ? `NS-ODR-${orderId}-R${retryCount}`
+      : `NS-ODR-${orderId}`;
+
     const payload = {
-      id: `NS${orderId}`,
+      id: uniqueShipmentId,
       unique_order_number: "yes",
       payment_method: paymentMode.toUpperCase() === "COD" ? "COD" : "prepaid",
       consigner_name: CONSIGNER_DATA.consigner_name,
@@ -264,7 +328,7 @@ export async function generateShipmentXpressbees(
       consignee_state: state,
       consignee_address: address,
       consignee_gst_number: order.consigneeGst || "",
-      products: items.map((item: any) => ({
+      products: items.map((item: XpressbeesItem) => ({
         product_name: item.productName || item.name || "Nutspice Fit Product",
         product_qty: String(item.quantity || item.qty || 1),
         product_price: String(item.price || 0),
@@ -272,7 +336,7 @@ export async function generateShipmentXpressbees(
       })),
       invoice: [
         {
-          invoice_number: order.invoiceNumber || `INV-NS-${orderId}`,
+          invoice_number: order.invoiceNumber || `NS-INV-${orderId}`,
           invoice_date: order.invoiceDate || new Date().toISOString().split("T")[0]
         }
       ],
@@ -288,6 +352,8 @@ export async function generateShipmentXpressbees(
       order_amount: String(totalAmount),
       collectable_amount: paymentMode.toUpperCase() === "COD" ? String(totalAmount) : "0"
     };
+
+    console.log("Xpressbees shipment payload:", payload);
 
     const response = await fetch(`${getApiUrl()}/franchise/shipments`, {
       method: "POST",
@@ -331,9 +397,9 @@ export async function generateShipmentXpressbees(
       shippingId: data.shipping_id,
       courierId: data.courier_id
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees generate shipment error:", error);
-    throw new Error(`Xpressbees Generate Shipment Failure: ${error.message}`);
+    throw new Error(`Xpressbees Generate Shipment Failure: ${getErrorMessage(error)}`);
   }
 }
 
@@ -388,9 +454,9 @@ export async function requestPickupXpressbees(awbNumbers: string[]): Promise<Pic
       message: data.message || "Pickup manifest generated successfully.",
       manifestUrl: data.data
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees request pickup error:", error);
-    throw new Error(`Xpressbees Request Pickup Failure: ${error.message}`);
+    throw new Error(`Xpressbees Request Pickup Failure: ${getErrorMessage(error)}`);
   }
 }
 
@@ -435,22 +501,23 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
       throw new Error(data.message || `Tracking failed: ${JSON.stringify(data)}`);
     }
 
-    const trackingData = data.tracking_data || {};
-    const rawActivities: any[] = [];
+    const trackingData = (data.tracking_data || {}) as Record<string, unknown>;
+    const rawActivities: XpressbeesTrackingActivity[] = [];
     const states = ["pending pickup", "in transit", "out for delivery", "delivered"];
     for (const state of states) {
-      if (Array.isArray(trackingData[state])) {
-        rawActivities.push(...trackingData[state]);
+      const stateList = trackingData[state];
+      if (Array.isArray(stateList)) {
+        rawActivities.push(...(stateList as XpressbeesTrackingActivity[]));
       }
     }
 
-    rawActivities.sort((a: any, b: any) => {
-      const timeA = parseInt(a.event_time) || 0;
-      const timeB = parseInt(b.event_time) || 0;
+    rawActivities.sort((a: XpressbeesTrackingActivity, b: XpressbeesTrackingActivity) => {
+      const timeA = parseInt(a.event_time || "0") || 0;
+      const timeB = parseInt(b.event_time || "0") || 0;
       return timeA - timeB;
     });
 
-    const history = rawActivities.map((item: any) => ({
+    const history = rawActivities.map((item: XpressbeesTrackingActivity) => ({
       status: item.status || item.ship_status || "IN_TRANSIT",
       location: item.location || "Transit Hub",
       message: item.message || "Shipment activity recorded.",
@@ -459,7 +526,7 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
         : new Date().toISOString()
     }));
 
-    const status = data.status || data.data?.status || (history.length > 0 ? history[history.length - 1].status : "IN_TRANSIT");
+    const status = (data.status as string) || (data.data?.status as string) || (history.length > 0 ? history[history.length - 1].status : "IN_TRANSIT");
 
     return {
       awbNumber,
@@ -475,9 +542,9 @@ export async function trackShipmentXpressbees(awbNumber: string): Promise<Tracki
       ],
       trackingData: trackingData
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees tracking error:", error);
-    throw new Error(`Xpressbees Tracking Failure: ${error.message}`);
+    throw new Error(`Xpressbees Tracking Failure: ${getErrorMessage(error)}`);
   }
 }
 
@@ -528,9 +595,9 @@ export async function cancelShipmentXpressbees(awbNumber: string): Promise<Cance
       status: "SHIPMENT_CANCELLED",
       message: data.message || `Shipment for AWB ${awbNumber} has been successfully cancelled in Xpressbees.`
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees cancellation error:", error);
-    throw new Error(`Xpressbees Cancellation Failure: ${error.message}`);
+    throw new Error(`Xpressbees Cancellation Failure: ${getErrorMessage(error)}`);
   }
 }
 
@@ -571,24 +638,24 @@ export async function getXpressbeesNDRList(): Promise<NDRItem[]> {
       throw new Error(data.message || `Failed to fetch NDR list: ${JSON.stringify(data)}`);
     }
 
-    const rawList = data.data || [];
-    return rawList.map((item: any) => ({
+    const rawList = (data.data || []) as { awb_number?: string; courier_remarks?: string; total_attempts?: number | string; event_date?: string }[];
+    return rawList.map((item) => ({
       awbNumber: item.awb_number || "",
       reason: item.courier_remarks || "NDR reported",
-      attempts: typeof item.total_attempts === "number" ? item.total_attempts : parseInt(item.total_attempts || "1"),
+      attempts: typeof item.total_attempts === "number" ? item.total_attempts : parseInt(String(item.total_attempts || "1")),
       status: "NDR_ACTION_REQUIRED",
       reportedAt: item.event_date ? new Date(item.event_date).toISOString() : new Date().toISOString()
     }));
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees get NDR list error:", error);
-    throw new Error(`Xpressbees NDR Retrieval Failure: ${error.message}`);
+    throw new Error(`Xpressbees NDR Retrieval Failure: ${getErrorMessage(error)}`);
   }
 }
 
 /**
  * Creates/submits an NDR instruction action back to Xpressbees.
  */
-export async function createXpressbeesNDR(payload: any): Promise<NDRResponse> {
+export async function createXpressbeesNDR(payload: XpressbeesNDRPayload): Promise<NDRResponse> {
   try {
     const token = await getXpressbeesToken();
 
@@ -598,7 +665,7 @@ export async function createXpressbeesNDR(payload: any): Promise<NDRResponse> {
     const reAttemptDate = payload.reAttemptDate || payload.re_attempt_date || new Date().toISOString().split("T")[0];
     const remarks = payload.remarks || "";
 
-    const ndrRequest: any = {
+    const ndrRequest: Record<string, unknown> = {
       awb: awb,
       action: action,
       re_attempt_date: reAttemptDate,
@@ -637,7 +704,7 @@ export async function createXpressbeesNDR(payload: any): Promise<NDRResponse> {
     }
 
     const data = await response.json();
-    const result = Array.isArray(data) ? data[0] : data;
+    const result = (Array.isArray(data) ? data[0] : data) as { status?: boolean; message?: string } | undefined;
 
     if (!result || result.status !== true) {
       throw new Error(result?.message || `NDR submission failed: ${JSON.stringify(data)}`);
@@ -645,12 +712,12 @@ export async function createXpressbeesNDR(payload: any): Promise<NDRResponse> {
 
     return {
       success: true,
-      awbNumber: awb,
-      action: action,
+      awbNumber: awb || "",
+      action: action || "",
       message: result.message || "NDR resolution instruction submitted successfully."
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Xpressbees NDR submit error:", error);
-    throw new Error(`Xpressbees NDR Submit Failure: ${error.message}`);
+    throw new Error(`Xpressbees NDR Submit Failure: ${getErrorMessage(error)}`);
   }
 }

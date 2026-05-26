@@ -25,18 +25,12 @@ export async function GET(req: Request) {
     const length = parseFloat(searchParams.get("length") || "10");
     const width = parseFloat(searchParams.get("width") || "10");
     const height = parseFloat(searchParams.get("height") || "10");
-    const destination = searchParams.get("destination") || "110001";
-    const cod = searchParams.get("cod") || "no";
-    const cod_amount = searchParams.get("cod_amount") || "0";
 
     const couriers = await getCouriers({
       weight,
       length,
       width,
-      height,
-      destination,
-      cod,
-      cod_amount
+      height
     });
 
     return NextResponse.json({ success: true, data: couriers });
