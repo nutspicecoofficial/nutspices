@@ -276,11 +276,19 @@ export async function generateShipmentXpressbees(
   try {
     const token = await getXpressbeesToken();
 
-    const customerName = order.customerName || order.fullName || order.name || "Valued Customer";
-    const customerPhone = order.customerPhone || order.phoneNumber || order.phone || "0000000000";
-    const address = order.shippingAddress || order.address || "";
+    const addressStr = order.shippingAddress || order.address || "";
+    const extract = (key: string) => {
+      const regex = new RegExp(`${key}:\\s*([^,]+)`, 'i');
+      const match = addressStr.match(regex);
+      return match ? match[1].trim() : null;
+    };
 
-    const { pincode, city, state } = extractAddressParts(address);
+    const parsedName = extract('Name') || order.customerName || order.fullName || order.name || 'Valued Customer';
+    const parsedPhone = extract('Contact') || order.customerPhone || order.phoneNumber || order.phone || '0000000000';
+    const parsedPincode = extract('Pincode') || '000000';
+    const parsedCity = extract('City') || 'Unknown';
+    const parsedState = extract('State') || 'Unknown';
+    const fullAddressWithoutPhone = addressStr.replace(/,?\s*Contact:\s*\d+/i, '').trim();
 
     const weight = packageDetails?.weight || 0.5;
     const length = packageDetails?.length || 10;
@@ -321,12 +329,12 @@ export async function generateShipmentXpressbees(
       consigner_state: CONSIGNER_DATA.consigner_state,
       consigner_address: CONSIGNER_DATA.consigner_address,
       consigner_gst_number: CONSIGNER_DATA.consigner_gst_number || "",
-      consignee_name: customerName,
-      consignee_phone: customerPhone,
-      consignee_pincode: pincode,
-      consignee_city: city,
-      consignee_state: state,
-      consignee_address: address,
+      consignee_name: parsedName.substring(0, 100),
+      consignee_phone: parsedPhone,
+      consignee_pincode: parsedPincode,
+      consignee_city: parsedCity.substring(0, 40),
+      consignee_state: parsedState.substring(0, 40),
+      consignee_address: fullAddressWithoutPhone.substring(0, 200),
       consignee_gst_number: order.consigneeGst || "",
       products: items.map((item: XpressbeesItem) => ({
         product_name: item.productName || item.name || "Nutspice Fit Product",
