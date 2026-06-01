@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/request'
+import type { NextRequest } from 'next/server'
 
 export default function proxy(request: NextRequest) {
   const session = request.cookies.get('auth_session')?.value

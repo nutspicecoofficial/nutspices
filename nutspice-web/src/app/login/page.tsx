@@ -123,6 +123,12 @@ export default function Login() {
           idToken
         }),
       });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 50)}`);
+      }
+      
       const data = await res.json();
       
       if (data.success) {
@@ -140,7 +146,7 @@ export default function Login() {
       if (err.code === "auth/invalid-verification-code") {
         setError("Incorrect OTP. Please try again.");
       } else {
-        setError("Failed to verify OTP. Please try again.");
+        setError(err.message || "Failed to verify OTP. Please try again.");
       }
     } finally {
       setLoading(false);
