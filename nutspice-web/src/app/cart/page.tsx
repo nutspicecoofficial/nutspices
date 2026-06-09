@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, CreditCard, ShieldCheck, CheckCircle2, Scissors, Sparkles, MapPin, AlertTriangle, Truck, Star } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, CreditCard, ShieldCheck, CheckCircle2, Scissors, Sparkles, MapPin, AlertTriangle, Truck, Star, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
+import PincodeEstimatorModal from "@/components/PincodeEstimatorModal";
 
 const PACKAGE_DIMENSIONS: Record<number, { L: number; B: number; H: number }> = {
   0.5 : { L: 10, B: 10, H: 10 },
@@ -87,9 +88,15 @@ export default function CartPage() {
   const [isLoadingRates, setIsLoadingRates] = useState(false);
   const [selectedRateId, setSelectedRateId] = useState("");
   const [shippingError, setShippingError] = useState<string | null>(null);
+  const [isPincodeModalOpen, setIsPincodeModalOpen] = useState(false);
 
   const totalWeight = calculateTotalWeight(items);
   const dimensions = getDimensionsForWeight(totalWeight);
+
+  const handlePincodeSubmit = (pincode: string) => {
+    setAddress((prev) => ({ ...prev, pincode }));
+    fetchAndCalculateShipping(pincode);
+  };
 
   const handleSelectRate = (rateId: string) => {
     setSelectedRateId(rateId);
@@ -566,10 +573,26 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between items-center text-brand/60 pb-4 border-b border-gray-100">
                 <span className="text-xs font-bold tracking-widest uppercase">Shipping</span>
-                {shippingCost !== null ? (
-                  <span className="text-[#005B41] font-bold text-sm">₹{shippingCost.toLocaleString()}</span>
+                {isLoadingRates ? (
+                  <div className="h-4 w-16 bg-[#005B41]/10 rounded animate-pulse"></div>
+                ) : shippingCost !== null ? (
+                  <div className="flex items-center space-x-1.5 animate-in fade-in duration-200">
+                    <span className="text-[#005B41] font-bold text-sm">₹{shippingCost.toFixed(2)}</span>
+                    <button 
+                      onClick={() => setIsPincodeModalOpen(true)}
+                      className="text-[#005B41] hover:text-[#004230] p-1 rounded transition-colors cursor-pointer"
+                      aria-label="Edit pincode"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </div>
                 ) : (
-                  <span className="text-xs font-black uppercase tracking-[0.2em] text-[#005B41]">Calculated at checkout</span>
+                  <button 
+                    onClick={() => setIsPincodeModalOpen(true)}
+                    className="text-xs font-bold text-[#005B41] hover:text-[#004230] hover:underline cursor-pointer animate-in fade-in duration-200"
+                  >
+                    Estimate Delivery
+                  </button>
                 )}
               </div>
               <div className="flex justify-between items-center pt-2">
@@ -868,6 +891,12 @@ export default function CartPage() {
           </div>
         </div>
       )}
+
+      <PincodeEstimatorModal
+        isOpen={isPincodeModalOpen}
+        onClose={() => setIsPincodeModalOpen(false)}
+        onSubmit={handlePincodeSubmit}
+      />
     </div>
   );
 }
