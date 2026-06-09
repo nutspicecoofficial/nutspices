@@ -3,8 +3,53 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, CreditCard, ShieldCheck, CheckCircle2, Scissors, Sparkles, MapPin, AlertTriangle } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, CreditCard, ShieldCheck, CheckCircle2, Scissors, Sparkles, MapPin, AlertTriangle, Truck, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+const PACKAGE_DIMENSIONS: Record<number, { L: number; B: number; H: number }> = {
+  0.5 : { L: 10, B: 10, H: 10 },
+  1 : { L: 20, B: 20, H: 20 },
+  1.5 : { L: 30, B: 30, H: 30 },
+  2 : { L: 40, B: 40, H: 40 },
+};
+
+function getDimensionsForWeight(weightInKg: number) {
+  const keys = [0.5, 1, 1.5, 2];
+  const matchedKey = keys.find(k => k >= weightInKg) || 2;
+  return PACKAGE_DIMENSIONS[matchedKey as keyof typeof PACKAGE_DIMENSIONS];
+}
+
+function parseWeightToKg(sizeStr: string): number {
+  if (!sizeStr) return 0.5;
+  const clean = sizeStr.toLowerCase().trim();
+  const numeric = parseFloat(clean);
+  if (isNaN(numeric)) return 0.5;
+  if (clean.endsWith("kg")) {
+    return numeric;
+  }
+  if (clean.endsWith("g")) {
+    return numeric / 1000;
+  }
+  // Fallback for unlabeled numbers
+  return numeric >= 10 ? numeric / 1000 : numeric;
+}
+
+function calculateTotalWeight(items: any[]): number {
+  if (!items || !Array.isArray(items) || items.length === 0) return 0.5;
+  let total = 0;
+  for (const item of items) {
+    const qty = item.quantity || 1;
+    const w = parseWeightToKg(item.size || "");
+    total += w * qty;
+  }
+  return total > 0 ? total : 0.5;
+}
+
+function extractPincode(address: string): string {
+  if (!address) return "";
+  const match = address.match(/\b\d{6}\b/);
+  return match ? match[0] : "";
+}
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, getTotalPrice, getTotalItems, clearCart } = useCartStore();
@@ -27,6 +72,24 @@ export default function CartPage() {
   const [orderId, setOrderId] = useState<number | null>(null);
   const router = useRouter();
 
+  // Shipping dynamic rates state variables
+  const [shippingCost, setShippingCost] = useState(0);
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [isLoadingRates, setIsLoadingRates] = useState(false);
+  const [selectedRateId, setSelectedRateId] = useState("");
+  const [shippingError, setShippingError] = useState<string | null>(null);
+
+  const totalWeight = calculateTotalWeight(items);
+  const dimensions = getDimensionsForWeight(totalWeight);
+
+  const handleSelectRate = (rateId: string) => {
+    setSelectedRateId(rateId);
+    const selected = shippingRates.find((r) => r.id === rateId);
+    if (selected) {
+      setShippingCost(selected.charge);
+    }
+  };
+
   // Handle hydration and load Razorpay script
   useEffect(() => {
     setIsHydrated(true);
@@ -41,6 +104,120 @@ export default function CartPage() {
       document.body.removeChild(script);
     };
   }, []);
+
+  // Fetch live shipping rates when checkout opens, pincode changes, or address changes
+  useEffect(() => {
+    if (!isCheckoutModalOpen) {
+      setShippingRates([]);
+      setShippingCost(0);
+      setSelectedRateId("");
+      setShippingError(null);
+      return;
+    }
+
+    let activePincode = "";
+    let shouldDebounce = false;
+
+    if (showNewAddressForm) {
+      activePincode = address.pincode.trim();
+      shouldDebounce = true;
+    } else if (selectedAddressIndex !== null && savedAddresses[selectedAddressIndex]) {
+      activePincode = extractPincode(savedAddresses[selectedAddressIndex]);
+      shouldDebounce = false;
+    }
+
+    if (!activePincode || activePincode.length !== 6) {
+      setShippingRates([]);
+      setShippingCost(0);
+      setSelectedRateId("");
+      if (showNewAddressForm && activePincode.length > 0) {
+        setShippingError("Please enter a valid 6-digit delivery pincode.");
+      } else if (!showNewAddressForm) {
+        setShippingError("Please select a delivery address.");
+      } else {
+        setShippingError(null);
+      }
+      return;
+    }
+
+    const w = totalWeight;
+    const l = dimensions.L;
+    const b = dimensions.B;
+    const h = dimensions.H;
+
+    setShippingError(null);
+    setIsLoadingRates(true);
+
+    const fetchRates = async () => {
+      try {
+        const res = await fetch("/api/shipping/calculate-rates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destinationPincode: activePincode,
+            weight: w,
+            length: l,
+            breadth: b,
+            height: h
+          })
+        });
+
+        const result = await res.json();
+        if (result.success && Array.isArray(result.rates) && result.rates.length > 0) {
+          const mappedRates = result.rates.map((r: any) => {
+            const name = r.name || "";
+            const isExpress = name.toLowerCase().includes("air") || name.toLowerCase().includes("express");
+            let id = isExpress ? "12993" : "12992"; // B2C AIR and B2C Surface
+            if (name.toLowerCase().includes("b2b")) {
+              id = "12994";
+            }
+            return {
+              id,
+              name,
+              charge: r.total_price ?? r.courier_charges ?? 65.0,
+              estimatedDays: isExpress ? 2 : 5
+            };
+          });
+
+          setShippingRates(mappedRates);
+
+          // Auto-select cheapest rate
+          const cheapest = mappedRates.reduce((prev: any, curr: any) => 
+            prev.charge < curr.charge ? prev : curr
+          );
+          setSelectedRateId(cheapest.id);
+          setShippingCost(cheapest.charge);
+        } else {
+          throw new Error(result.error || "No rates available. Pincode may be invalid or unserviceable.");
+        }
+      } catch (err: any) {
+        console.error(err);
+        setShippingRates([]);
+        setShippingCost(0);
+        setSelectedRateId("");
+        setShippingError(err.message || "Error calculating rates. Location may be unserviceable.");
+      } finally {
+        setIsLoadingRates(false);
+      }
+    };
+
+    if (shouldDebounce) {
+      const timer = setTimeout(fetchRates, 500);
+      return () => clearTimeout(timer);
+    } else {
+      fetchRates();
+    }
+  }, [
+    isCheckoutModalOpen,
+    showNewAddressForm,
+    selectedAddressIndex,
+    savedAddresses,
+    address.pincode,
+    totalWeight,
+    dimensions.L,
+    dimensions.B,
+    dimensions.H
+  ]);
 
   if (!isHydrated) {
     return (
@@ -71,12 +248,18 @@ export default function CartPage() {
   }
 
   const subtotal = getTotalPrice();
-  const shipping = 0; 
+  const shipping = shippingCost; 
   const total = subtotal + shipping;
 
   const handleCheckout = async () => {
     setIsCheckoutModalOpen(true);
     setPaymentStep("address");
+    
+    // Reset shipping states when opening checkout
+    setShippingCost(0);
+    setShippingRates([]);
+    setSelectedRateId("");
+    setShippingError(null);
     
     // Attempt to fetch saved addresses
     setFetchingAddress(true);
@@ -116,6 +299,16 @@ export default function CartPage() {
         throw new Error(orderData.error || "Failed to initiate payment");
       }
 
+      // Find selected rate details to send
+      const selectedRate = shippingRates.find((r) => r.id === selectedRateId);
+      const shippingDetailsObj = selectedRate ? {
+        courierId: selectedRate.id,
+        courierName: selectedRate.name,
+        shippingCharges: selectedRate.charge,
+        weight: totalWeight,
+        dimensions: dimensions
+      } : null;
+
       // 2. Open Razorpay Checkout
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_your_key_id", // Fallback for safety
@@ -137,6 +330,7 @@ export default function CartPage() {
                 shippingAddress: showNewAddressForm 
                   ? `Name: ${address.fullName}, Street: ${address.street}, City: ${address.city}, State: ${address.state}, Pincode: ${address.pincode}, Contact: ${address.phone}`
                   : savedAddresses[selectedAddressIndex || 0],
+                shippingDetails: shippingDetailsObj ? JSON.stringify(shippingDetailsObj) : null,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_signature: response.razorpay_signature
@@ -291,7 +485,11 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between items-center text-brand/60 pb-4 border-b border-gray-100">
                 <span className="text-xs font-bold tracking-widest uppercase">Shipping</span>
-                <span className="text-xs font-black uppercase tracking-[0.2em] text-[#005B41]">Free</span>
+                {shippingCost > 0 ? (
+                  <span className="text-[#005B41] font-bold text-sm">₹{shippingCost.toLocaleString()}</span>
+                ) : (
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-[#005B41]">Calculated at checkout</span>
+                )}
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-sm font-black tracking-widest uppercase text-brand">Total Amount</span>
@@ -456,19 +654,121 @@ export default function CartPage() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Delivery Options & Shipping Calculator */}
+                  <div className="space-y-4 pt-4 border-t border-brand/5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-brand uppercase tracking-widest">
+                        Delivery Options
+                      </h4>
+                      {isLoadingRates && (
+                        <div className="flex items-center space-x-2 text-[10px] text-brand/40 font-bold uppercase tracking-wider">
+                          <Loader2 size={12} className="animate-spin text-[#005B41]" />
+                          <span>Loading rates...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {isLoadingRates ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-pulse">
+                        <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between">
+                          <div className="space-y-2 flex-grow">
+                            <div className="h-4 bg-brand/10 rounded w-3/4"></div>
+                            <div className="h-3 bg-brand/5 rounded w-1/2"></div>
+                          </div>
+                          <div className="h-4 bg-brand/10 rounded w-12"></div>
+                        </div>
+                        <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between">
+                          <div className="space-y-2 flex-grow">
+                            <div className="h-4 bg-brand/10 rounded w-3/4"></div>
+                            <div className="h-3 bg-brand/5 rounded w-1/2"></div>
+                          </div>
+                          <div className="h-4 bg-brand/10 rounded w-12"></div>
+                        </div>
+                      </div>
+                    ) : shippingError ? (
+                      <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start space-x-3 text-rose-800">
+                        <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-rose-600" />
+                        <div className="text-xs font-semibold">{shippingError}</div>
+                      </div>
+                    ) : shippingRates.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {shippingRates.map((rate) => {
+                          const isSelected = selectedRateId === rate.id;
+                          return (
+                            <div
+                              key={rate.id}
+                              onClick={() => handleSelectRate(rate.id)}
+                              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start justify-between ${
+                                isSelected
+                                  ? "border-[#005B41] bg-[#005B41]/[0.03] shadow-xs"
+                                  : "border-brand/10 hover:border-brand/20 hover:bg-brand/[0.01]"
+                              }`}
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <Truck size={14} className={isSelected ? "text-[#005B41]" : "text-brand/40"} />
+                                  <span className="text-xs font-bold text-brand">{rate.name}</span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-[10px] font-medium text-brand/40">
+                                  <span>Est: {rate.estimatedDays} days</span>
+                                  <span className="flex items-center text-amber-500">
+                                    <Star size={10} className="fill-amber-500 mr-0.5" />
+                                    4.5
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-bold text-[#005B41]">₹{rate.charge.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-brand/5 rounded-2xl text-center border border-dashed border-brand/10">
+                        <p className="text-[10px] font-black text-brand/30 uppercase tracking-widest">
+                          Please enter or select a delivery address to calculate shipping.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Checkout Order Summary inside modal */}
+                  {!isLoadingRates && !shippingError && shippingRates.length > 0 && (
+                    <div className="bg-[#F9F6EE] border border-[#C5A059]/30 rounded-2xl p-4 space-y-2.5 mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex justify-between items-center text-xs font-bold text-brand/60">
+                        <span>Subtotal</span>
+                        <span>₹{subtotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-bold text-brand/60">
+                        <span>Shipping ({shippingRates.find(r => r.id === selectedRateId)?.name || "Courier"})</span>
+                        <span>₹{shippingCost.toLocaleString()}</span>
+                      </div>
+                      <div className="border-t border-brand/10 pt-2 flex justify-between items-center text-sm font-black text-brand">
+                        <span>Total Amount</span>
+                        <span className="text-[#005B41]">₹{total.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-4 pt-4">
                     <button 
+                      type="button"
                       onClick={() => setIsCheckoutModalOpen(false)}
                       className="flex-1 py-4 border-2 border-brand/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-brand/40 hover:bg-brand/5 transition-all"
                     >
                       Cancel
                     </button>
                     <button 
+                      type="button"
                       disabled={
-                        showNewAddressForm 
+                        isLoadingRates ||
+                        !!shippingError ||
+                        shippingRates.length === 0 ||
+                        (showNewAddressForm 
                           ? (!address.fullName || !address.street || !address.city || address.pincode.length !== 6 || address.phone.length !== 10)
-                          : selectedAddressIndex === null
+                          : selectedAddressIndex === null)
                       }
                       onClick={handleRazorpayPayment}
                       className="flex-[2] py-4 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-hover shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"

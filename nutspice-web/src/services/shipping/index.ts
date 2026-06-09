@@ -95,3 +95,31 @@ export async function createNDR(ndrData: unknown) {
   }
   return xpressbeesService.createXpressbeesNDR(ndrData as xpressbeesService.XpressbeesNDRPayload);
 }
+
+/**
+ * Calculates shipping rates.
+ * Routes to either mock service or production Xpressbees API.
+ */
+export async function calculatePricing(params: any) {
+  if (USE_MOCK) {
+    return {
+      status: true,
+      message: [
+        {
+          name: "B2C Surface",
+          courier_charges: 65.0,
+          cod_charges: 0,
+          total_price: 65.0
+        },
+        {
+          name: "B2C AIR",
+          courier_charges: 110.0,
+          cod_charges: 0,
+          total_price: 110.0
+        }
+      ]
+    };
+  }
+  return xpressbeesService.calculatePricingXpressbees(params as xpressbeesService.XpressbeesPricingParams);
+}
+

@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       totalAmount, 
       paymentMethod, 
       shippingAddress,
+      shippingDetails,
       razorpay_payment_id,
       razorpay_order_id,
       razorpay_signature 
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
           totalAmount: totalAmount,
           status: "Order Placed", 
           shippingAddress: shippingAddress,
+          shippingDetails: shippingDetails,
           paymentId: razorpay_payment_id,
           razorpayOrderId: razorpay_order_id,
           createdAt: new Date().toISOString(),

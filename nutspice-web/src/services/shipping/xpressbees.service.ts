@@ -729,3 +729,105 @@ export async function createXpressbeesNDR(payload: XpressbeesNDRPayload): Promis
     throw new Error(`Xpressbees NDR Submit Failure: ${getErrorMessage(error)}`);
   }
 }
+
+export interface XpressbeesPricingParams {
+  destinationPincode: string | number;
+  weight: string | number;
+  length: string | number;
+  breadth: string | number;
+  height: string | number;
+}
+
+/**
+ * Calculates B2C shipping rates using Xpressbees calculate_pricing API.
+ * COD is strictly disabled, so cod is set to "no" and cod_amount is omitted to avoid API validation errors.
+ */
+export async function calculatePricingXpressbees(
+  params: XpressbeesPricingParams
+): Promise<any> {
+  if (process.env.USE_MOCK_SHIPPING === "true") {
+    return {
+      status: true,
+      message: [
+        {
+          name: "B2C Surface",
+          courier_charges: 65.0,
+          cod_charges: 0,
+          total_price: 65.0
+        },
+        {
+          name: "B2C AIR",
+          courier_charges: 110.0,
+          cod_charges: 0,
+          total_price: 110.0
+        }
+      ]
+    };
+  }
+
+  try {
+    const token = await getXpressbeesToken();
+
+    // Construct the payload as required by Xpressbees.
+    // cod_amount is omitted because the API rejects cod_amount="0" when cod="no" with validation error.
+    const payload = {
+      order_type_user: "ecom",
+      origin: "500035",
+      destination: String(params.destinationPincode),
+      weight: String(params.weight),
+      length: String(params.length),
+      height: String(params.height),
+      breadth: String(params.breadth),
+      cod: "no"
+    };
+
+    const response = await fetch(`${getApiUrl()}/franchise/shipments/calculate_pricing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Pricing calculation request failed with status ${response.status}`;
+      try {
+        const errorJson = await response.json();
+        if (errorJson && typeof errorJson.message === "string") {
+          errorMessage = errorJson.message;
+        } else if (errorJson) {
+          errorMessage = JSON.stringify(errorJson);
+        }
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        } catch {}
+      }
+      throw new Error(errorMessage);
+    }
+
+    const text = await response.text();
+    if (!text || text.trim() === "") {
+      throw new Error("Pincode is invalid or unserviceable.");
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error("Pincode is invalid or unserviceable.");
+    }
+
+    if (data.status !== true) {
+      throw new Error(data.message || "Pincode is invalid or unserviceable.");
+    }
+
+    return data;
+  } catch (error: unknown) {
+    console.error("Xpressbees pricing calculation error:", error);
+    throw new Error(`Xpressbees Pricing Calculation Failure: ${getErrorMessage(error)}`);
+  }
+}
+
