@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, ShoppingCart, User, Menu, X, LogOut, AlertCircle, BookOpen } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X, LogOut, AlertCircle, BookOpen, Briefcase } from "lucide-react";
 import ProfileDropdown from "./ProfileDropdown";
 import SearchModal from "./SearchModal";
 import Image from "next/image";
@@ -254,9 +254,14 @@ export default function Navbar() {
                 </form>
               </div>
 
-              <Link href="/about" aria-label="About Us" className="hover:text-[#C5A059] transition-colors p-2 flex items-center gap-1 group whitespace-nowrap">
+              <Link href="/about" aria-label="Our Store" className="hover:text-[#C5A059] transition-colors p-2 flex items-center gap-1 group whitespace-nowrap">
                 <BookOpen className="h-5 w-5" />
-                <span className="text-[10px] font-black tracking-wider hidden lg:block">About Us</span>
+                <span className="text-[10px] font-black tracking-wider hidden lg:block">Our Store</span>
+              </Link>
+
+              <Link href="/b2b" aria-label="B2B" className="hover:text-[#C5A059] transition-colors p-2 flex items-center gap-1 group whitespace-nowrap">
+                <Briefcase className="h-5 w-5" />
+                <span className="text-[10px] font-black tracking-wider hidden lg:block">B2B</span>
               </Link>
 
               <Link href={user ? "/cart" : "/login"} aria-label="Cart" className="hover:text-[#C5A059] transition-colors relative p-2">
@@ -287,8 +292,11 @@ export default function Navbar() {
               <button onClick={() => setIsSearchOpen(true)} aria-label="Search" className="text-white p-2">
                 <Search className="h-5 w-5" />
               </button>
-              <Link href="/about" aria-label="About Us" className="text-white p-2">
+              <Link href="/about" aria-label="Our Store" className="text-white p-2">
                 <BookOpen className="h-5 w-5" />
+              </Link>
+              <Link href="/b2b" aria-label="B2B" className="text-white p-2">
+                <Briefcase className="h-5 w-5" />
               </Link>
               <Link href={user ? "/cart" : "/login"} aria-label="Cart" className="text-white relative p-2">
                 <ShoppingCart className="h-5 w-5" />

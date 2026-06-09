@@ -44,13 +44,16 @@ export default function ProductCard({ product }: { product: Product }) {
           </h3>
         </Link>
 
-        <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 mb-4 mt-auto">
-          <span className="text-[#005B41] font-bold text-xl whitespace-nowrap">
-            ₹ {(product.price || 0).toLocaleString()}
-          </span>
-          <span className="text-gray-400 text-xs font-medium line-through whitespace-nowrap">
-            MRP ₹ {mrp.toLocaleString()}
-          </span>
+        <div className="mt-auto mb-4 flex flex-col items-start w-full px-1">
+          <span className="text-[10px] font-black text-gray-400 tracking-wider mb-0.5">Starting From</span>
+          <div className="flex flex-wrap items-baseline justify-start gap-x-2 gap-y-0.5">
+            <span className="text-[#005B41] font-bold text-xl whitespace-nowrap">
+              ₹ {(product.price || 0).toLocaleString()}
+            </span>
+            <span className="text-gray-400 text-xs font-medium line-through whitespace-nowrap">
+              MRP ₹ {mrp.toLocaleString()}
+            </span>
+          </div>
         </div>
 
         {/* Action Button */}
