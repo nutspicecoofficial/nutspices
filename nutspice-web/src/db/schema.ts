@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, blob, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, blob, real, index } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -119,3 +119,16 @@ export const homeTabs = sqliteTable("home_tabs", {
   displayOrder: integer("display_order").notNull().default(0),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
 });
+
+export const packageTiers = sqliteTable("package_tiers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  maxWeightGrams: integer("max_weight_grams").notNull(),
+  lengthCm: integer("length_cm").notNull(),
+  breadthCm: integer("breadth_cm").notNull(),
+  heightCm: integer("height_cm").notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("max_weight_idx").on(table.maxWeightGrams)
+]);
