@@ -51,6 +51,15 @@ function extractPincode(address: string): string {
   return match ? match[0] : "";
 }
 
+function calculateFallbackShipping(totalWeightGrams: number): number {
+  if (totalWeightGrams <= 500) {
+    return 65;
+  }
+  const extraWeight = totalWeightGrams - 500;
+  const extraUnits = Math.ceil(extraWeight / 500);
+  return 65 + extraUnits * 50;
+}
+
 export default function CartPage() {
   const { items, updateQuantity, removeItem, getTotalPrice, getTotalItems, clearCart } = useCartStore();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -73,7 +82,7 @@ export default function CartPage() {
   const router = useRouter();
 
   // Shipping dynamic rates state variables
-  const [shippingCost, setShippingCost] = useState(0);
+  const [shippingCost, setShippingCost] = useState<number | null>(null);
   const [shippingRates, setShippingRates] = useState<any[]>([]);
   const [isLoadingRates, setIsLoadingRates] = useState(false);
   const [selectedRateId, setSelectedRateId] = useState("");
@@ -87,6 +96,104 @@ export default function CartPage() {
     const selected = shippingRates.find((r) => r.id === rateId);
     if (selected) {
       setShippingCost(selected.charge);
+    }
+  };
+
+  const fetchAndCalculateShipping = async (pincode: string) => {
+    const w = totalWeight;
+    const l = dimensions.L;
+    const b = dimensions.B;
+    const h = dimensions.H;
+
+    if (isNaN(w) || w <= 0 || isNaN(l) || l <= 0 || isNaN(b) || b <= 0 || isNaN(h) || h <= 0) {
+      setShippingCost(null);
+      setShippingError("Invalid packaging weight or dimensions.");
+      return;
+    }
+
+    setShippingError(null);
+    setIsLoadingRates(true);
+
+    try {
+      // Race the fetch against a 5-second timeout to handle hanging requests
+      const fetchPromise = fetch("/api/shipping/calculate-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destinationPincode: pincode,
+          weight: w,
+          length: l,
+          breadth: b,
+          height: h
+        })
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), 5000)
+      );
+
+      const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      const result = await res.json();
+      if (result.success && Array.isArray(result.rates) && result.rates.length > 0) {
+        const mappedRates = result.rates.map((r: any) => {
+          const name = r.name || "";
+          const isExpress = name.toLowerCase().includes("air") || name.toLowerCase().includes("express");
+          let id = isExpress ? "12993" : "12992";
+          if (name.toLowerCase().includes("b2b")) {
+            id = "12994";
+          }
+          return {
+            id,
+            name,
+            charge: r.total_price ?? r.courier_charges ?? 65.0,
+            estimatedDays: isExpress ? 2 : 5
+          };
+        });
+
+        setShippingRates(mappedRates);
+
+        // Success: Filter the API response array for B2C Surface
+        const surfaceRate = mappedRates.find((r: any) => r.name && r.name.includes("B2C Surface"));
+        
+        let finalCost: number;
+        if (surfaceRate) {
+          finalCost = surfaceRate.charge;
+          setSelectedRateId(surfaceRate.id);
+        } else {
+          // If B2C Surface not found, fallback to lowest rate in the array
+          const cheapest = mappedRates.reduce((prev: any, curr: any) => 
+            prev.charge < curr.charge ? prev : curr
+          );
+          finalCost = cheapest.charge;
+          setSelectedRateId(cheapest.id);
+        }
+
+        setShippingCost(finalCost);
+      } else {
+        throw new Error(result.error || "No rates available.");
+      }
+    } catch (err: any) {
+      console.warn("Shipping rates API calculation failed, falling back to local calculation:", err);
+      // Fallback/Timeout/500 error fallback
+      const fallbackCost = calculateFallbackShipping(totalWeight * 1000);
+      setShippingCost(fallbackCost);
+      setSelectedRateId("fallback_surface");
+      setShippingRates([
+        {
+          id: "fallback_surface",
+          name: "Standard Shipping (Local Fallback)",
+          charge: fallbackCost,
+          estimatedDays: 5
+        }
+      ]);
+      setShippingError(null);
+    } finally {
+      setIsLoadingRates(false);
     }
   };
 
@@ -105,15 +212,50 @@ export default function CartPage() {
     };
   }, []);
 
-  // Fetch live shipping rates when checkout opens, pincode changes, or address changes
+  // Load saved addresses and session on mount, trigger auto-fetch if default address exists
   useEffect(() => {
-    if (!isCheckoutModalOpen) {
-      setShippingRates([]);
-      setShippingCost(0);
-      setSelectedRateId("");
-      setShippingError(null);
-      return;
-    }
+    if (!isHydrated) return;
+
+    const loadSavedAddressesOnMount = async () => {
+      setFetchingAddress(true);
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        const sessionData = await sessionRes.json();
+        if (sessionData.authenticated) {
+          const res = await fetch("/api/profile/address");
+          const data = await res.json();
+          if (data.success && data.addresses && data.addresses.length > 0) {
+            setSavedAddresses(data.addresses);
+            setSelectedAddressIndex(0);
+            setShowNewAddressForm(false);
+            
+            // Extract pincode and calculate immediately
+            const pincode = extractPincode(data.addresses[0]);
+            if (pincode && pincode.length === 6) {
+              fetchAndCalculateShipping(pincode);
+            }
+          } else {
+            setSavedAddresses([]);
+            setShowNewAddressForm(true);
+          }
+        } else {
+          setSavedAddresses([]);
+          setShowNewAddressForm(true);
+        }
+      } catch (e) {
+        console.error("Failed to load saved addresses on mount", e);
+        setShowNewAddressForm(true);
+      } finally {
+        setFetchingAddress(false);
+      }
+    };
+
+    loadSavedAddressesOnMount();
+  }, [isHydrated]);
+
+  // Fetch live shipping rates when pincode changes or address changes
+  useEffect(() => {
+    if (!isHydrated) return;
 
     let activePincode = "";
     let shouldDebounce = false;
@@ -128,11 +270,11 @@ export default function CartPage() {
 
     if (!activePincode || activePincode.length !== 6) {
       setShippingRates([]);
-      setShippingCost(0);
+      setShippingCost(null);
       setSelectedRateId("");
       if (showNewAddressForm && activePincode.length > 0) {
         setShippingError("Please enter a valid 6-digit delivery pincode.");
-      } else if (!showNewAddressForm) {
+      } else if (!showNewAddressForm && savedAddresses.length > 0) {
         setShippingError("Please select a delivery address.");
       } else {
         setShippingError(null);
@@ -140,75 +282,18 @@ export default function CartPage() {
       return;
     }
 
-    const w = totalWeight;
-    const l = dimensions.L;
-    const b = dimensions.B;
-    const h = dimensions.H;
-
-    setShippingError(null);
-    setIsLoadingRates(true);
-
-    const fetchRates = async () => {
-      try {
-        const res = await fetch("/api/shipping/calculate-rates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            destinationPincode: activePincode,
-            weight: w,
-            length: l,
-            breadth: b,
-            height: h
-          })
-        });
-
-        const result = await res.json();
-        if (result.success && Array.isArray(result.rates) && result.rates.length > 0) {
-          const mappedRates = result.rates.map((r: any) => {
-            const name = r.name || "";
-            const isExpress = name.toLowerCase().includes("air") || name.toLowerCase().includes("express");
-            let id = isExpress ? "12993" : "12992"; // B2C AIR and B2C Surface
-            if (name.toLowerCase().includes("b2b")) {
-              id = "12994";
-            }
-            return {
-              id,
-              name,
-              charge: r.total_price ?? r.courier_charges ?? 65.0,
-              estimatedDays: isExpress ? 2 : 5
-            };
-          });
-
-          setShippingRates(mappedRates);
-
-          // Auto-select cheapest rate
-          const cheapest = mappedRates.reduce((prev: any, curr: any) => 
-            prev.charge < curr.charge ? prev : curr
-          );
-          setSelectedRateId(cheapest.id);
-          setShippingCost(cheapest.charge);
-        } else {
-          throw new Error(result.error || "No rates available. Pincode may be invalid or unserviceable.");
-        }
-      } catch (err: any) {
-        console.error(err);
-        setShippingRates([]);
-        setShippingCost(0);
-        setSelectedRateId("");
-        setShippingError(err.message || "Error calculating rates. Location may be unserviceable.");
-      } finally {
-        setIsLoadingRates(false);
-      }
+    const calculate = () => {
+      fetchAndCalculateShipping(activePincode);
     };
 
     if (shouldDebounce) {
-      const timer = setTimeout(fetchRates, 500);
+      const timer = setTimeout(calculate, 500);
       return () => clearTimeout(timer);
     } else {
-      fetchRates();
+      calculate();
     }
   }, [
-    isCheckoutModalOpen,
+    isHydrated,
     showNewAddressForm,
     selectedAddressIndex,
     savedAddresses,
@@ -248,18 +333,12 @@ export default function CartPage() {
   }
 
   const subtotal = getTotalPrice();
-  const shipping = shippingCost; 
+  const shipping = shippingCost ?? 0; 
   const total = subtotal + shipping;
 
   const handleCheckout = async () => {
     setIsCheckoutModalOpen(true);
     setPaymentStep("address");
-    
-    // Reset shipping states when opening checkout
-    setShippingCost(0);
-    setShippingRates([]);
-    setSelectedRateId("");
-    setShippingError(null);
     
     // Attempt to fetch saved addresses
     setFetchingAddress(true);
@@ -268,7 +347,9 @@ export default function CartPage() {
       const data = await res.json();
       if (data.success && data.addresses && data.addresses.length > 0) {
         setSavedAddresses(data.addresses);
-        setSelectedAddressIndex(0);
+        if (selectedAddressIndex === null || selectedAddressIndex >= data.addresses.length) {
+          setSelectedAddressIndex(0);
+        }
         setShowNewAddressForm(false);
       } else {
         setSavedAddresses([]);
@@ -485,7 +566,7 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between items-center text-brand/60 pb-4 border-b border-gray-100">
                 <span className="text-xs font-bold tracking-widest uppercase">Shipping</span>
-                {shippingCost > 0 ? (
+                {shippingCost !== null ? (
                   <span className="text-[#005B41] font-bold text-sm">₹{shippingCost.toLocaleString()}</span>
                 ) : (
                   <span className="text-xs font-black uppercase tracking-[0.2em] text-[#005B41]">Calculated at checkout</span>
@@ -691,39 +772,28 @@ export default function CartPage() {
                         <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-rose-600" />
                         <div className="text-xs font-semibold">{shippingError}</div>
                       </div>
-                    ) : shippingRates.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {shippingRates.map((rate) => {
-                          const isSelected = selectedRateId === rate.id;
-                          return (
-                            <div
-                              key={rate.id}
-                              onClick={() => handleSelectRate(rate.id)}
-                              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start justify-between ${
-                                isSelected
-                                  ? "border-[#005B41] bg-[#005B41]/[0.03] shadow-xs"
-                                  : "border-brand/10 hover:border-brand/20 hover:bg-brand/[0.01]"
-                              }`}
-                            >
-                              <div className="space-y-1">
-                                <div className="flex items-center space-x-2">
-                                  <Truck size={14} className={isSelected ? "text-[#005B41]" : "text-brand/40"} />
-                                  <span className="text-xs font-bold text-brand">{rate.name}</span>
-                                </div>
-                                <div className="flex items-center space-x-2 text-[10px] font-medium text-brand/40">
-                                  <span>Est: {rate.estimatedDays} days</span>
-                                  <span className="flex items-center text-amber-500">
-                                    <Star size={10} className="fill-amber-500 mr-0.5" />
-                                    4.5
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-xs font-bold text-[#005B41]">₹{rate.charge.toFixed(2)}</span>
-                              </div>
+                    ) : shippingCost !== null ? (
+                      <div className="grid grid-cols-1 gap-3">
+                        <div
+                          className="p-4 rounded-2xl border-2 border-[#005B41] bg-[#005B41]/[0.03] shadow-xs flex items-start justify-between"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Truck size={14} className="text-[#005B41]" />
+                              <span className="text-xs font-bold text-brand">Standard Shipping</span>
                             </div>
-                          );
-                        })}
+                            <div className="flex items-center space-x-2 text-[10px] font-medium text-brand/40">
+                              <span>Est: 3-5 business days</span>
+                              <span className="flex items-center text-amber-500">
+                                <Star size={10} className="fill-amber-500 mr-0.5" />
+                                4.5
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-bold text-[#005B41]">₹{shippingCost.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-4 bg-brand/5 rounded-2xl text-center border border-dashed border-brand/10">
@@ -735,14 +805,14 @@ export default function CartPage() {
                   </div>
 
                   {/* Checkout Order Summary inside modal */}
-                  {!isLoadingRates && !shippingError && shippingRates.length > 0 && (
+                  {!isLoadingRates && !shippingError && shippingCost !== null && (
                     <div className="bg-[#F9F6EE] border border-[#C5A059]/30 rounded-2xl p-4 space-y-2.5 mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="flex justify-between items-center text-xs font-bold text-brand/60">
                         <span>Subtotal</span>
                         <span>₹{subtotal.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs font-bold text-brand/60">
-                        <span>Shipping ({shippingRates.find(r => r.id === selectedRateId)?.name || "Courier"})</span>
+                        <span>Shipping (Standard Shipping)</span>
                         <span>₹{shippingCost.toLocaleString()}</span>
                       </div>
                       <div className="border-t border-brand/10 pt-2 flex justify-between items-center text-sm font-black text-brand">
@@ -764,8 +834,7 @@ export default function CartPage() {
                       type="button"
                       disabled={
                         isLoadingRates ||
-                        !!shippingError ||
-                        shippingRates.length === 0 ||
+                        shippingCost === null ||
                         (showNewAddressForm 
                           ? (!address.fullName || !address.street || !address.city || address.pincode.length !== 6 || address.phone.length !== 10)
                           : selectedAddressIndex === null)
