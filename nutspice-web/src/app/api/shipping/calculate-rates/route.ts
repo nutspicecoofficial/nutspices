@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { calculatePricingXpressbees } from "@/services/shipping/xpressbees.service";
+import { db } from "@/db";
+import { packageTiers } from "@/db/schema";
+import { asc } from "drizzle-orm";
 
 /**
  * POST /api/shipping/calculate-rates
@@ -20,7 +23,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { destinationPincode, weight, length, breadth, height } = body;
+    const { destinationPincode, weight, length: clientLength, breadth: clientBreadth, height: clientHeight } = body;
 
     // Check presence of required parameters
     if (destinationPincode === undefined || destinationPincode === null || String(destinationPincode).trim() === "") {
@@ -37,34 +40,53 @@ export async function POST(req: Request) {
       );
     }
 
-    if (length === undefined || length === null) {
-      return NextResponse.json(
-        { success: false, error: "Length is required." },
-        { status: 400 }
-      );
-    }
+    // Perform database lookup for packaging dimensions based on weight
+    const totalWeightGrams = (Number(weight) || 0.5) * 1000;
+    let finalLength = 10;
+    let finalBreadth = 10;
+    let finalHeight = 10;
 
-    if (breadth === undefined || breadth === null) {
-      return NextResponse.json(
-        { success: false, error: "Breadth is required." },
-        { status: 400 }
-      );
-    }
+    try {
+      const tiers = await db.select()
+        .from(packageTiers)
+        .orderBy(asc(packageTiers.maxWeightGrams));
 
-    if (height === undefined || height === null) {
-      return NextResponse.json(
-        { success: false, error: "Height is required." },
-        { status: 400 }
-      );
+      if (tiers && tiers.length > 0) {
+        // Find the first tier where maxWeightGrams >= totalWeightGrams
+        const matchedTier = tiers.find(t => t.maxWeightGrams >= totalWeightGrams);
+
+        if (matchedTier) {
+          finalLength = matchedTier.lengthCm;
+          finalBreadth = matchedTier.breadthCm;
+          finalHeight = matchedTier.heightCm;
+        } else {
+          // Oversized Fallback: select the largest tier and scale dimensions proportionally
+          const largestTier = tiers[tiers.length - 1];
+          const ratio = totalWeightGrams / largestTier.maxWeightGrams;
+          finalLength = Math.ceil(largestTier.lengthCm * ratio);
+          finalBreadth = Math.ceil(largestTier.breadthCm * ratio);
+          finalHeight = Math.ceil(largestTier.heightCm * ratio);
+        }
+      } else {
+        console.warn("package_tiers table is empty. Falling back to client or default dimensions.");
+        finalLength = Number(clientLength) || 10;
+        finalBreadth = Number(clientBreadth) || 10;
+        finalHeight = Number(clientHeight) || 10;
+      }
+    } catch (dbError) {
+      console.error("Failed to query package_tiers database table:", dbError);
+      finalLength = Number(clientLength) || 10;
+      finalBreadth = Number(clientBreadth) || 10;
+      finalHeight = Number(clientHeight) || 10;
     }
 
     // Call the Xpressbees pricing calculation service
     const pricingRes = await calculatePricingXpressbees({
       destinationPincode,
       weight,
-      length,
-      breadth,
-      height
+      length: finalLength,
+      breadth: finalBreadth,
+      height: finalHeight
     });
 
     const rates = pricingRes?.message;
