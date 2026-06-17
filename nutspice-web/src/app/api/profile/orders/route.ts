@@ -27,6 +27,7 @@ export async function GET() {
       shippingAddress: orders.shippingAddress,
       createdAt: orders.createdAt,
       paymentId: orders.paymentId,
+      cancelReason: orders.cancelReason,
     })
     .from(orders)
     .where(eq(orders.userId, user.id))

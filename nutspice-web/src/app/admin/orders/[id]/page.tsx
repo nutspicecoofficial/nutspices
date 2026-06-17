@@ -115,7 +115,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
     orderStatus: order.orderStatus,
     shippingStatus: order.shippingStatus,
     awbNumber: order.awbNumber,
-    shippingDetails: order.shippingDetails
+    shippingDetails: order.shippingDetails,
+    cancelReason: order.cancelReason
   };
 
   const serializedItems = items.map(item => ({

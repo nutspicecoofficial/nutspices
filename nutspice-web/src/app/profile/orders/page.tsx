@@ -25,6 +25,7 @@ interface Order {
   createdAt: string;
   paymentId?: string | null;
   customerPhone?: string | null;
+  cancelReason?: string | null;
   items: OrderItem[];
 }
 
@@ -139,8 +140,8 @@ export default function MyOrdersPage() {
                     <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5">Status</p>
                     <div>
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                        order.status === 'delivered' ? 'bg-green-500/20 text-green-300' : 
-                        order.status === 'cancelled' ? 'bg-red-500/20 text-red-300' : 
+                        order.status?.toLowerCase() === 'delivered' ? 'bg-green-500/20 text-green-300' : 
+                        order.status?.toLowerCase() === 'cancelled' ? 'bg-red-500/20 text-red-300' : 
                         'bg-[#C5A059]/20 text-[#C5A059]'
                       }`}>
                         {order.status}
@@ -159,7 +160,7 @@ export default function MyOrdersPage() {
               </div>
 
               {/* Delivery Milestones Tracker */}
-              {order.status !== "cancelled" && (
+              {order.status?.toLowerCase() !== "cancelled" ? (
                 <div className="px-6 md:px-16 lg:px-24 pb-10 pt-10 bg-gray-50/50">
                   <div className="relative">
                     {/* Background Line */}
@@ -169,15 +170,16 @@ export default function MyOrdersPage() {
                     <div 
                       className="absolute top-1/2 left-0 h-[3px] bg-green-500 -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
                       style={{ 
-                        width: `${(Math.max(0, MILESTONES.indexOf(order.status))) / (MILESTONES.length - 1) * 100}%` 
+                        width: `${(Math.max(0, MILESTONES.findIndex(m => m.toLowerCase() === order.status?.toLowerCase()))) / (MILESTONES.length - 1) * 100}%` 
                       }} 
                     />
 
                     {/* Milestone Dots */}
                     <div className="relative flex justify-between">
                       {MILESTONES.map((m, idx) => {
-                        const isCompleted = MILESTONES.indexOf(order.status) >= idx;
-                        const isCurrent = order.status === m;
+                        const currentIdx = MILESTONES.findIndex(milestone => milestone.toLowerCase() === order.status?.toLowerCase());
+                        const isCompleted = currentIdx >= idx;
+                        const isCurrent = order.status?.toLowerCase() === m.toLowerCase();
                         
                         let Icon = Package;
                         if (m === "Processing") Icon = Cog;
@@ -203,6 +205,62 @@ export default function MyOrdersPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Cancelled Order Tracker with Reason Beside It */
+                <div className="px-6 md:px-12 lg:px-16 pb-10 pt-10 bg-gray-50/50 border-b border-brand/5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                    {/* Progress Bar (2 Columns on Medium and Large screens) */}
+                    <div className="md:col-span-2 relative pr-0 md:pr-8 py-4">
+                      {/* Background Line */}
+                      <div className="absolute top-1/2 left-0 w-full h-[3px] bg-gray-200 -translate-y-1/2 rounded-full" />
+                      
+                      {/* Active Progress Line (Red/Rose for cancellation) */}
+                      <div 
+                        className="absolute top-1/2 left-0 h-[3px] bg-rose-500 -translate-y-1/2 rounded-full transition-all duration-1000 ease-out" 
+                        style={{ width: "100%" }} 
+                      />
+
+                      {/* Milestone Dots */}
+                      <div className="relative flex justify-between">
+                        {/* Milestone 1: Order Placed */}
+                        <div className="flex flex-col items-center">
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-rose-50 border-2 border-rose-500 text-rose-600 z-10">
+                            <Package size={16} />
+                          </div>
+                          <span className="absolute mt-12 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-center whitespace-nowrap text-rose-600">
+                            Order Placed
+                          </span>
+                        </div>
+
+                        {/* Milestone 2: Order Cancelled */}
+                        <div className="flex flex-col items-center">
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-rose-50 border-2 border-rose-500 text-rose-600 z-10 ring-4 ring-rose-500/20">
+                            <XCircle size={16} />
+                          </div>
+                          <span className="absolute mt-12 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-center whitespace-nowrap text-rose-600">
+                            Order Cancelled
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cancellation Details / Reason Card (1 Column on Medium and Large screens) */}
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 shadow-xs">
+                      <AlertTriangle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-0.5">Cancellation Details</p>
+                        <p className="text-xs text-rose-800 font-bold leading-relaxed break-words">
+                          {order.cancelReason && order.cancelReason.toLowerCase() !== "cancelled by customer"
+                            ? `Order Cancelled by Admin - ${order.cancelReason}`
+                            : "Order Cancelled by Customer"}
+                        </p>
+                        <p className="text-[9px] text-rose-700/80 font-medium mt-1 leading-relaxed">
+                          A refund will be initiated if payment was captured. Amount will be credited within 7 to 9 business days.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -280,7 +338,7 @@ export default function MyOrdersPage() {
 
                     {/* Actions & Notes */}
                     <div className="mt-4">
-                      {["Order Placed", "Processing"].includes(order.status) && (
+                      {["order placed", "processing"].includes(order.status?.toLowerCase() || "") && (
                         <div className="space-y-4">
                           {confirmingCancelId === order.id ? (
                             <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -324,18 +382,7 @@ export default function MyOrdersPage() {
                   </div>
                 </div>
 
-                {/* Cancelled Status Message */}
-                {order.status === "cancelled" && (
-                  <div className="mt-8 pt-6 border-t border-brand/5">
-                    <div className="flex items-start sm:items-center space-x-4 px-6 py-5 rounded-2xl bg-red-50 border border-red-100 text-red-600 shadow-sm">
-                      <AlertTriangle size={20} className="flex-shrink-0 mt-0.5 sm:mt-0" />
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-widest mb-1">Order Cancelled</p>
-                        <p className="text-[10px] font-medium opacity-80 leading-relaxed">A refund will be initiated if payment was captured. Amount will be credited within 7 to 9 business days.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
               </div>
               </div>
           ))}

@@ -35,6 +35,7 @@ export async function GET() {
       shippingStatus: orders.shippingStatus,
       awbNumber: orders.awbNumber,
       shippingDetails: orders.shippingDetails,
+      cancelReason: orders.cancelReason,
     })
     .from(orders)
     .leftJoin(users, eq(orders.userId, users.id))

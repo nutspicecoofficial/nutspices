@@ -46,6 +46,7 @@ interface Order {
   shippingStatus: string | null;
   awbNumber: string | null;
   shippingDetails: string | null;
+  cancelReason: string | null;
   customerPhone?: string; // fallback phone
 }
 
@@ -178,7 +179,24 @@ export default function OrderDetailClient({
         </div>
       )}
 
-      {/* Order Status Timeline Row */}
+      {/* Cancelled Alert Banner */}
+      {order.status?.toLowerCase() === "cancelled" && (
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 shrink-0">
+              <XCircle size={20} />
+            </div>
+            <div>
+              <h5 className="text-xs font-bold text-rose-900 uppercase tracking-wider mb-0.5">Order Cancelled</h5>
+              <p className="text-xs text-rose-800 font-semibold leading-relaxed">
+                {order.cancelReason && order.cancelReason !== "Cancelled by customer"
+                  ? `Order Cancelled by Admin: "${order.cancelReason}"`
+                  : `Order Cancelled: "${order.cancelReason || "No reason provided."}"`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-brand/5 p-4 rounded-2xl border border-brand/5 mb-6">
         <div>
           <p className="text-[8px] font-black text-brand/35 uppercase tracking-wider mb-1">Order State</p>
