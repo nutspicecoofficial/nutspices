@@ -12,10 +12,12 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+import { isAdminNumber } from "@/lib/admin";
+
 async function checkAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  if (session !== "9999999999") {
+  if (!session || !isAdminNumber(session)) {
     redirect("/admin/login");
   }
 }

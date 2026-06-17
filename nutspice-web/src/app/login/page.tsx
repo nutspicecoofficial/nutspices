@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ShieldCheck, User, Phone, Loader2 } from "lucide-react";
@@ -27,6 +27,31 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [timer, setTimer] = useState(0);
+  const recaptchaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Clean up on mount to prevent any stale verifiers from other pages
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.error("Error clearing recaptcha on mount:", e);
+      }
+      (window as any).recaptchaVerifier = null;
+    }
+
+    return () => {
+      // Clean up on unmount
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing recaptcha on unmount:", e);
+        }
+        (window as any).recaptchaVerifier = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -58,15 +83,27 @@ export default function Login() {
     setError("");
     
     try {
-      // 1. Initialize reCAPTCHA
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          'size': 'invisible',
-          'callback': () => {
-            // reCAPTCHA solved - will proceed with submit
-          }
-        });
+      // Clean up any stale verifier (e.g. from admin login page)
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing stale recaptcha verifier:", e);
+        }
+        (window as any).recaptchaVerifier = null;
       }
+
+      if (!recaptchaRef.current) {
+        throw new Error("reCAPTCHA container element not found.");
+      }
+
+      // 1. Initialize reCAPTCHA
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaRef.current, {
+        'size': 'invisible',
+        'callback': () => {
+          // reCAPTCHA solved - will proceed with submit
+        }
+      });
 
       const phoneNumber = `+91${phone}`;
       const appVerifier = window.recaptchaVerifier;
@@ -233,7 +270,7 @@ export default function Login() {
           </div>
 
           {/* Invisible reCAPTCHA container */}
-          <div id="recaptcha-container"></div>
+          <div ref={recaptchaRef}></div>
 
           {error && (
             <div className="mb-8 p-5 bg-red-50 border border-red-100 text-red-500 text-xs font-bold rounded-2xl text-center flex items-center justify-center space-x-3 shadow-sm animate-in zoom-in-95">

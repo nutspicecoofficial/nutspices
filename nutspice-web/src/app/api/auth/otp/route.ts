@@ -21,6 +21,20 @@ export async function POST(request: Request) {
 
     // Action 1: Send OTP
     if (action === "send") {
+      if (portal === "admin") {
+        const { isAdminNumber } = await import("@/lib/admin");
+        if (!isAdminNumber(phone)) {
+          return NextResponse.json(
+            { success: false, error: "Unauthorized phone number. This portal is for administrators only." },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (body.checkOnly) {
+        return NextResponse.json({ success: true, message: "Authorized admin number" });
+      }
+
       console.log(`[Auth Request ${requestId}] MOCK Sending OTP to ${phone}`);
       
       // Always use 123456 for everyone during development
@@ -90,9 +104,20 @@ export async function POST(request: Request) {
       // Delete the OTP as it's been used
       await db.delete(otpVerifications).where(eq(otpVerifications.phoneNumber, phone));
 
+      if (portal === "admin") {
+        const { isAdminNumber } = await import("@/lib/admin");
+        if (!isAdminNumber(phone)) {
+          return NextResponse.json(
+            { success: false, error: "Unauthorized phone number. This portal is for administrators only." },
+            { status: 403 }
+          );
+        }
+      }
+
       let user = null;
       let isNewUser = false;
-      const adminPhone = "9999999999";
+      const { isAdminNumber } = await import("@/lib/admin");
+      const isAuthAdmin = isAdminNumber(phone);
 
       try {
         console.log(`[Auth Request ${requestId}] Querying database for phone: ${phone}`);
@@ -108,7 +133,7 @@ export async function POST(request: Request) {
           // Register new user automatically if not found
           await db.insert(users).values({
             phoneNumber: phone,
-            role: phone === adminPhone ? "admin" : "user",
+            role: isAuthAdmin ? "admin" : "user",
             lastLoginAt: new Date().toISOString(),
           });
           isNewUser = true;
@@ -118,7 +143,7 @@ export async function POST(request: Request) {
           await db.update(users)
             .set({ 
               lastLoginAt: new Date().toISOString(),
-              ...(phone === adminPhone && user.role !== "admin" ? { role: "admin" } : {})
+              ...(isAuthAdmin && user.role !== "admin" ? { role: "admin" } : {})
             })
             .where(eq(users.phoneNumber, phone));
           

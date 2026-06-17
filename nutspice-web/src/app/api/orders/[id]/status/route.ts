@@ -12,13 +12,15 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { generateShipment, requestPickup, cancelShipment } from "@/services/shipping";
 
+import { isAdminNumber } from "@/lib/admin";
+
 /**
  * Checks if the caller session is an administrator.
  */
 async function isAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  return session === "9999999999";
+  return session ? isAdminNumber(session) : false;
 }
 
 export async function PATCH(

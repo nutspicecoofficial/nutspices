@@ -14,7 +14,8 @@ export async function POST(request: Request) {
 
     let user = null;
     let isNewUser = false;
-    const adminPhone = "9999999999";
+    const { isAdminNumber } = await import("@/lib/admin");
+    const isAuthAdmin = isAdminNumber(phone);
 
     const userResult = await db.select()
       .from(users)
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       // Register new user automatically if not found
       await db.insert(users).values({
         phoneNumber: phone,
-        role: phone === adminPhone ? "admin" : "user",
+        role: isAuthAdmin ? "admin" : "user",
         lastLoginAt: new Date().toISOString(),
       });
       isNewUser = true;
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       await db.update(users)
         .set({ 
           lastLoginAt: new Date().toISOString(),
-          ...(phone === adminPhone && user.role !== "admin" ? { role: "admin" } : {})
+          ...(isAuthAdmin && user.role !== "admin" ? { role: "admin" } : {})
         })
         .where(eq(users.phoneNumber, phone));
       
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
     // Session Persistence: Set a secure cookie
     try {
       const cookieStore = await cookies();
-      const cookieName = phone === adminPhone ? "admin_session" : "auth_session";
+      const cookieName = isAuthAdmin ? "admin_session" : "auth_session";
       // We use the phone number as the session value to maintain compatibility with existing middleware
       cookieStore.set(cookieName, phone, { 
         httpOnly: true,

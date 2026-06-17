@@ -1,9 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Lock, Phone, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+
+declare global {
+  interface Window {
+    recaptchaVerifier: RecaptchaVerifier;
+    confirmationResult: ConfirmationResult;
+  }
+}
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -12,8 +21,31 @@ export default function AdminLogin() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const recaptchaRef = useRef<HTMLDivElement>(null);
 
-  const adminPhone = "9999999999";
+  useEffect(() => {
+    // Clean up on mount to prevent any stale verifiers from other pages
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.error("Error clearing recaptcha on mount:", e);
+      }
+      (window as any).recaptchaVerifier = null;
+    }
+
+    return () => {
+      // Clean up on unmount
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing recaptcha on unmount:", e);
+        }
+        (window as any).recaptchaVerifier = null;
+      }
+    };
+  }, []);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -29,28 +61,74 @@ export default function AdminLogin() {
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone !== adminPhone) {
-      setError("Unauthorized phone number. This portal is for administrators only.");
-      return;
-    }
+    if (phone.length !== 10) return;
 
     setLoading(true);
     setError("");
 
     try {
+      // 1. Pre-verify that the number is authorized in the server backend
       const res = await fetch("/api/auth/otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", phone }),
+        body: JSON.stringify({ action: "send", phone, portal: "admin", checkOnly: true }),
       });
       const data = await res.json();
-      if (data.success) {
-        setStep("otp");
-      } else {
-        setError(data.error || "Failed to send OTP");
+      
+      if (!data.success) {
+        setError(data.error || "Unauthorized phone number.");
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError("Something went wrong. Please try again.");
+
+      // Clean up any stale verifier (e.g. from user login page)
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing stale recaptcha verifier:", e);
+        }
+        (window as any).recaptchaVerifier = null;
+      }
+
+      if (!recaptchaRef.current) {
+        throw new Error("reCAPTCHA container element not found.");
+      }
+
+      // 2. Initialize Firebase reCAPTCHA verifier
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaRef.current, {
+        size: "invisible",
+        callback: () => {
+          // reCAPTCHA solved
+        },
+      });
+
+      const phoneNumber = `+91${phone}`;
+      const appVerifier = window.recaptchaVerifier;
+
+      // 3. Request OTP from Firebase
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      window.confirmationResult = confirmationResult;
+
+      setStep("otp");
+    } catch (err: any) {
+      console.error("Firebase OTP Error:", err);
+      if (err.code === "auth/invalid-phone-number") {
+        setError("Invalid phone number format.");
+      } else if (err.code === "auth/too-many-requests") {
+        setError("Too many attempts. Please try again later.");
+      } else {
+        setError(err.message || "Failed to send OTP. Please check your connection.");
+      }
+      // Reset recaptcha on error
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing recaptcha on send error:", e);
+        }
+        (window as any).recaptchaVerifier = null;
+      }
     } finally {
       setLoading(false);
     }
@@ -64,10 +142,20 @@ export default function AdminLogin() {
     setError("");
 
     try {
+      if (!window.confirmationResult) {
+        throw new Error("No confirmation result found. Please resend OTP.");
+      }
+
+      // 1. Verify OTP with Firebase to get ID token
+      const result = await window.confirmationResult.confirm(otp);
+      const firebaseUser = result.user;
+      const idToken = await firebaseUser.getIdToken();
+
+      // 2. Authenticate the session on the backend
       const res = await fetch("/api/auth/otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", phone, otp, portal: "admin" }),
+        body: JSON.stringify({ action: "verify", phone, idToken, portal: "admin" }),
       });
       const data = await res.json();
 
@@ -77,8 +165,13 @@ export default function AdminLogin() {
       } else {
         setError(data.error || "Invalid OTP");
       }
-    } catch (err) {
-      setError("Verification failed. Please try again.");
+    } catch (err: any) {
+      console.error("Verification failed:", err);
+      if (err.code === "auth/invalid-verification-code") {
+        setError("Incorrect OTP. Please try again.");
+      } else {
+        setError(err.message || "Verification failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -86,12 +179,12 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen bg-[#1B3022] flex flex-col justify-center items-center p-4 font-inter">
-
-
-
       <div className="w-full max-w-md bg-white rounded-3xl p-10 shadow-2xl border-t-[12px] border-t-[#C5A059] relative overflow-hidden">
         {/* Subtle background decoration */}
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#C5A059]/5 rounded-full blur-3xl"></div>
+
+        {/* Invisible reCAPTCHA container */}
+        <div ref={recaptchaRef}></div>
 
         <div className="text-center mb-10">
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[#1B3022] flex items-center justify-center shadow-2xl relative">
