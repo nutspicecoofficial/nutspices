@@ -3,11 +3,12 @@ import { db } from "@/db";
 import { orders, orderItems, products, users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { isAdminNumber } from "@/lib/admin";
 
 async function isAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  return session === "9999999999";
+  return session ? isAdminNumber(session) : false;
 }
 
 export async function GET() {

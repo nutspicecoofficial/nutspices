@@ -7,11 +7,12 @@
 import { NextResponse } from "next/server";
 import { getCouriers } from "@/services/shipping";
 import { cookies } from "next/headers";
+import { isAdminNumber } from "@/lib/admin";
 
 async function isAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  return session === "9999999999";
+  return session ? isAdminNumber(session) : false;
 }
 
 export async function GET(req: Request) {

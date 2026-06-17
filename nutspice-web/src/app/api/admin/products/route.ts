@@ -4,11 +4,12 @@ import { products, productVariations, orderItems, cartItems, orders } from "@/db
 import { eq, like, or, sql, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isAdminNumber } from "@/lib/admin";
 
 async function isAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  return session === "9999999999";
+  return session ? isAdminNumber(session) : false;
 }
 
 export async function GET(request: Request) {

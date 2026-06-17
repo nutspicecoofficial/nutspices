@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getNDRList, createNDR } from "@/services/shipping";
+import { isAdminNumber } from "@/lib/admin";
 
 /**
  * Checks if the caller session is an administrator.
@@ -11,7 +12,7 @@ import { getNDRList, createNDR } from "@/services/shipping";
 async function isAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin_session")?.value;
-  return session === "9999999999";
+  return session ? isAdminNumber(session) : false;
 }
 
 /**
