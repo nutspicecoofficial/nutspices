@@ -233,26 +233,14 @@ export default function Navbar() {
             </nav>
 
             <div className="hidden md:flex items-center space-x-4 ml-auto text-white">
-              {/* Amazon Style Search Bar */}
-              <div className="max-w-[200px]">
-                <form onSubmit={handleSearchSubmit} className="w-full flex">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search NutspiceCo..."
-                      className="w-full bg-white text-brand-dark px-3 py-2 rounded-l-md text-xs focus:outline-none placeholder:text-brand-dark/40"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="bg-[#C5A059] hover:bg-[#B38E46] text-white px-3 rounded-r-md transition-colors flex items-center justify-center"
-                  >
-                    <Search size={16} strokeWidth={2.5} />
-                  </button>
-                </form>
-              </div>
+              {/* Search Icon Triggering Modal */}
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="Search"
+                className="hover:text-[#C5A059] transition-colors p-2 flex items-center cursor-pointer"
+              >
+                <Search className="h-5 w-5" />
+              </button>
 
               <Link href="/about" aria-label="Our Store" className="hover:text-[#C5A059] transition-colors p-2 flex items-center gap-1 group whitespace-nowrap">
                 <BookOpen className="h-5 w-5" />

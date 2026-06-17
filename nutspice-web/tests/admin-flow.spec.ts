@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(60000);
 
 test.describe('Nutspice Admin Flow', () => {
-  const ADMIN_PHONE = '9999999999';
+  const ADMIN_PHONE = '9704761386';
   const OTP = '123456';
 
   test('Admin journey: Login -> Dashboard -> Orders -> Inventory', async ({ page }) => {

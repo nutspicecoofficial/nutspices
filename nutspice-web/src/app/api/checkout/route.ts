@@ -115,6 +115,8 @@ export async function POST(req: Request) {
           }
         }
 
+        const isPrepaid = paymentMethod === "online_prepaid";
+
         // 2. Create Order
         const [newOrder] = await tx.insert(orders).values({
           userId: user.id,
@@ -124,6 +126,10 @@ export async function POST(req: Request) {
           shippingDetails: shippingDetails,
           paymentId: razorpay_payment_id,
           razorpayOrderId: razorpay_order_id,
+          paymentMode: isPrepaid ? "Prepaid" : null,
+          paymentStatus: isPrepaid ? "PAID" : null,
+          amountPaid: isPrepaid ? totalAmount : null,
+          razorpayPaymentId: isPrepaid ? razorpay_payment_id : null,
           createdAt: new Date().toISOString(),
         }).returning();
 

@@ -30,6 +30,7 @@ export async function GET() {
       amountPaid: orders.amountPaid,
       razorpayOrderId: orders.razorpayOrderId,
       razorpayPaymentId: orders.razorpayPaymentId,
+      paymentId: orders.paymentId,
       orderStatus: orders.orderStatus,
       shippingStatus: orders.shippingStatus,
       awbNumber: orders.awbNumber,

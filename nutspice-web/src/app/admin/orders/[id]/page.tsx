@@ -111,6 +111,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     amountPaid: order.amountPaid,
     razorpayOrderId: order.razorpayOrderId,
     razorpayPaymentId: order.razorpayPaymentId,
+    paymentId: order.paymentId,
     orderStatus: order.orderStatus,
     shippingStatus: order.shippingStatus,
     awbNumber: order.awbNumber,

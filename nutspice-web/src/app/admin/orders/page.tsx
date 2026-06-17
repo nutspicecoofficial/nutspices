@@ -52,6 +52,7 @@ type Order = {
   amountPaid?: number | null;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  paymentId?: string | null;
   orderStatus?: string | null;
   shippingStatus?: string | null;
   awbNumber?: string | null;
@@ -700,6 +701,8 @@ export default function AdminOrders() {
                         amountPaid={order.amountPaid}
                         razorpayOrderId={order.razorpayOrderId}
                         razorpayPaymentId={order.razorpayPaymentId}
+                        paymentId={order.paymentId}
+                        totalAmount={order.totalAmount}
                       />
                     </div>
                     

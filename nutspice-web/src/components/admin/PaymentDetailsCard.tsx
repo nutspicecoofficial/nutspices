@@ -7,6 +7,8 @@ interface PaymentDetailsCardProps {
   amountPaid?: number | null;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  paymentId?: string | null;
+  totalAmount?: number | null;
 }
 
 export default function PaymentDetailsCard({
@@ -15,9 +17,22 @@ export default function PaymentDetailsCard({
   amountPaid,
   razorpayOrderId,
   razorpayPaymentId,
+  paymentId,
+  totalAmount,
 }: PaymentDetailsCardProps) {
-  const isPaid = paymentStatus?.toUpperCase() === "PAID";
-  const isFailed = paymentStatus?.toUpperCase() === "FAILED";
+  // Resolve legacy orders where specific payment details fields were left null
+  const resolvedPaymentId = razorpayPaymentId || paymentId || null;
+  const hasPayment = !!resolvedPaymentId;
+  const isOnline = hasPayment || !!razorpayOrderId;
+
+  const resolvedMode = paymentMode || (isOnline ? "Prepaid" : "N/A");
+  const resolvedStatus = paymentStatus || (hasPayment ? "PAID" : "N/A");
+  const resolvedAmount = amountPaid !== undefined && amountPaid !== null
+    ? amountPaid
+    : (hasPayment && totalAmount !== undefined && totalAmount !== null ? totalAmount : null);
+
+  const isPaid = resolvedStatus?.toUpperCase() === "PAID";
+  const isFailed = resolvedStatus?.toUpperCase() === "FAILED";
 
   const getStatusStyle = (status?: string | null) => {
     if (!status) return "text-brand/40 italic font-medium";
@@ -46,7 +61,7 @@ export default function PaymentDetailsCard({
             Mode
           </span>
           <span className="text-xs font-bold text-brand uppercase tracking-wider">
-            {paymentMode || "N/A"}
+            {resolvedMode}
           </span>
         </div>
 
@@ -54,8 +69,8 @@ export default function PaymentDetailsCard({
           <span className="block text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1.5">
             Status
           </span>
-          <span className={`text-xs uppercase tracking-wider ${getStatusStyle(paymentStatus)}`}>
-            {paymentStatus || "N/A"}
+          <span className={`text-xs uppercase tracking-wider ${getStatusStyle(resolvedStatus)}`}>
+            {resolvedStatus}
           </span>
         </div>
 
@@ -66,7 +81,7 @@ export default function PaymentDetailsCard({
             Amount Paid
           </span>
           <span className="text-sm font-black text-brand font-sans">
-            {amountPaid !== undefined && amountPaid !== null ? `₹${amountPaid.toLocaleString()}` : "N/A"}
+            {resolvedAmount !== null ? `₹${resolvedAmount.toLocaleString()}` : "N/A"}
           </span>
         </div>
 
@@ -84,7 +99,7 @@ export default function PaymentDetailsCard({
             Razorpay Payment ID
           </span>
           <span className="text-xs font-semibold text-brand break-all font-mono">
-            {razorpayPaymentId || "N/A"}
+            {resolvedPaymentId || "N/A"}
           </span>
         </div>
       </div>

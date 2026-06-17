@@ -13,7 +13,7 @@ test.describe('Nutspice User Flow', () => {
 
     // 2. Login
     await page.click('button:has-text("Login"), a:has-text("Login")');
-    await page.locator('input[placeholder*="digits"]').pressSequentially(TEST_PHONE, { delay: 100 });
+    await page.locator('input[placeholder="9999999999"]').pressSequentially(TEST_PHONE, { delay: 100 });
     await page.click('button:has-text("Continue")');
     
     // Fill OTP
