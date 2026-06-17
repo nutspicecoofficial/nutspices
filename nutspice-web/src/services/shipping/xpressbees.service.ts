@@ -14,6 +14,18 @@ import {
   NDRResponse,
   CourierService
 } from "./mock.service";
+import dns from "dns";
+
+// Force Node.js to resolve IPv4 addresses first to avoid ENOTFOUND issues
+// with IPv6-first DNS lookups on some networks.
+try {
+  if (dns && typeof dns.setDefaultResultOrder === "function") {
+    dns.setDefaultResultOrder("ipv4first");
+  }
+} catch (error) {
+  console.warn("Could not set DNS default result order to ipv4first:", error);
+}
+
 
 export interface XpressbeesOrder {
   customerName?: string;
