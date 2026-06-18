@@ -40,44 +40,60 @@ export async function POST(req: Request) {
       );
     }
 
-    // Perform database lookup for packaging dimensions based on weight
-    const totalWeightGrams = (Number(weight) || 0.5) * 1000;
+    const parsedLength = Number(clientLength);
+    const parsedBreadth = Number(clientBreadth);
+    const parsedHeight = Number(clientHeight);
+
     let finalLength = 10;
     let finalBreadth = 10;
     let finalHeight = 10;
 
-    try {
-      const tiers = await db.select()
-        .from(packageTiers)
-        .orderBy(asc(packageTiers.maxWeightGrams));
+    // If dimensions are explicitly provided and valid (> 0), bypass database query
+    if (
+      !isNaN(parsedLength) && parsedLength > 0 &&
+      !isNaN(parsedBreadth) && parsedBreadth > 0 &&
+      !isNaN(parsedHeight) && parsedHeight > 0
+    ) {
+      finalLength = parsedLength;
+      finalBreadth = parsedBreadth;
+      finalHeight = parsedHeight;
+    } else {
+      // Perform database lookup for packaging dimensions based on weight
+      const totalWeightGrams = (Number(weight) || 0.5) * 1000;
 
-      if (tiers && tiers.length > 0) {
-        // Find the first tier where maxWeightGrams >= totalWeightGrams
-        const matchedTier = tiers.find(t => t.maxWeightGrams >= totalWeightGrams);
+      try {
+        const tiers = await db.select()
+          .from(packageTiers)
+          .orderBy(asc(packageTiers.maxWeightGrams));
 
-        if (matchedTier) {
-          finalLength = matchedTier.lengthCm;
-          finalBreadth = matchedTier.breadthCm;
-          finalHeight = matchedTier.heightCm;
+        if (tiers && tiers.length > 0) {
+          // Find the first tier where maxWeightGrams >= totalWeightGrams
+          const matchedTier = tiers.find(t => t.maxWeightGrams >= totalWeightGrams);
+
+          if (matchedTier) {
+            finalLength = matchedTier.lengthCm;
+            finalBreadth = matchedTier.breadthCm;
+            finalHeight = matchedTier.heightCm;
+          } else {
+            // Oversized Fallback: select the largest tier and scale dimensions proportionally
+            const largestTier = tiers[tiers.length - 1];
+            const ratio = totalWeightGrams / largestTier.maxWeightGrams;
+            finalLength = Math.ceil(largestTier.lengthCm * ratio);
+            finalBreadth = Math.ceil(largestTier.breadthCm * ratio);
+            finalHeight = Math.ceil(largestTier.heightCm * ratio);
+          }
         } else {
-          // Oversized Fallback: select the largest tier and scale dimensions proportionally
-          const largestTier = tiers[tiers.length - 1];
-          const ratio = totalWeightGrams / largestTier.maxWeightGrams;
-          finalLength = Math.ceil(largestTier.lengthCm * ratio);
-          finalBreadth = Math.ceil(largestTier.breadthCm * ratio);
-          finalHeight = Math.ceil(largestTier.heightCm * ratio);
+          console.warn("package_tiers table is empty. Falling back to client or default dimensions.");
+          finalLength = parsedLength || 10;
+          finalBreadth = parsedBreadth || 10;
+          finalHeight = parsedHeight || 10;
         }
-      } else {
-        console.warn("package_tiers table is empty. Falling back to client or default dimensions.");
-        finalLength = Number(clientLength) || 10;
-        finalBreadth = Number(clientBreadth) || 10;
-        finalHeight = Number(clientHeight) || 10;
+      } catch (dbError) {
+        console.error("Failed to query package_tiers database table:", dbError);
+        finalLength = parsedLength || 10;
+        finalBreadth = parsedBreadth || 10;
+        finalHeight = parsedHeight || 10;
       }
-    } catch (dbError) {
-      console.error("Failed to query package_tiers database table:", dbError);
-      finalLength = Number(clientLength) || 10;
-      finalBreadth = Number(clientBreadth) || 10;
-      finalHeight = Number(clientHeight) || 10;
     }
 
     // Call the Xpressbees pricing calculation service
