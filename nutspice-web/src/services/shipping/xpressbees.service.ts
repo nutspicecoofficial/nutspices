@@ -97,8 +97,8 @@ function getErrorMessage(error: unknown): string {
 const getApiUrl = () => process.env.XPRESSBEES_API_URL || "https://ship.xpressbees.com/api";
 
 export const CONSIGNER_DATA = {
-  consigner_name: "Nutspice Co 9985088446",
-  consigner_phone: "9985088446",
+  consigner_name: "Nutspice Co",
+  consigner_phone: "9703088446",
   consigner_pincode: "500035",
   consigner_city: "HYDERABAD",
   consigner_state: "Telangana",
