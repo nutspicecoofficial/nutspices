@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { packageTiers } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { isAdminNumber } from "@/lib/admin";
 
@@ -39,6 +39,21 @@ export async function POST(request: Request) {
     }
 
     await db.transaction(async (tx) => {
+      // 1. Fetch existing tier IDs from the database
+      const existingTiers = await tx.select({ id: packageTiers.id }).from(packageTiers);
+      
+      // 2. Extract IDs from the incoming request payload
+      const incomingIds = tiersList.map((t: any) => t.id).filter(Boolean);
+      
+      // 3. Determine which IDs to delete
+      const idsToDelete = existingTiers.map(t => t.id).filter(id => !incomingIds.includes(id));
+      
+      // 4. Delete the missing tiers
+      if (idsToDelete.length > 0) {
+        await tx.delete(packageTiers).where(inArray(packageTiers.id, idsToDelete));
+      }
+
+      // 5. Update or insert current tiers
       for (const tier of tiersList) {
         const { id, name, maxWeightGrams, lengthCm, breadthCm, heightCm } = tier;
 
