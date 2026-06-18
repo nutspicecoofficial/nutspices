@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getNDRList, createNDR } from "@/services/shipping";
 import { isAdminNumber } from "@/lib/admin";
 
@@ -29,6 +29,17 @@ export async function GET() {
 
   try {
     const ndrList = await getNDRList();
+    
+    // Extract non-null AWB numbers from the NDR list
+    const awbNumbers = ndrList.map(item => item.awbNumber).filter(Boolean);
+    
+    // Batch query the orders table to avoid N+1 database queries
+    const matchedOrders = awbNumbers.length > 0
+      ? await db.select().from(orders).where(inArray(orders.awbNumber, awbNumbers))
+      : [];
+
+    // Map matched orders by AWB number for O(1) lookups
+    const orderMap = new Map(matchedOrders.map(o => [o.awbNumber, o]));
     const enrichedList: any[] = [];
 
     // Dynamically sync and enrich exceptions
@@ -36,21 +47,17 @@ export async function GET() {
       if (!item.awbNumber) {
         enrichedList.push({
           ...item,
+          isLocal: false,
           ndrResolutions: []
         });
         continue;
       }
 
-      const orderRows = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.awbNumber, item.awbNumber))
-        .limit(1);
-
+      const order = orderMap.get(item.awbNumber);
       let ndrResolutions: any[] = [];
+      const isLocal = !!order;
 
-      if (orderRows.length > 0) {
-        const order = orderRows[0];
+      if (order) {
         let currentDetails: any = {};
         if (order.shippingDetails) {
           try {
@@ -86,6 +93,8 @@ export async function GET() {
 
       enrichedList.push({
         ...item,
+        isLocal,
+        orderId: order ? order.id : undefined,
         ndrResolutions
       });
     }

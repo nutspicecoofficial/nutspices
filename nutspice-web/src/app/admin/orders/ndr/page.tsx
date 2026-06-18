@@ -23,6 +23,8 @@ interface NDRItem {
   status: string;
   reportedAt: string;
   ndrResolutions?: any[];
+  isLocal?: boolean;
+  orderId?: number;
 }
 
 export default function NdrDashboard() {
@@ -30,6 +32,7 @@ export default function NdrDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<'LOCAL' | 'ALL'>('LOCAL');
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,6 +78,9 @@ export default function NdrDashboard() {
     fetchNdrList(true);
   };
 
+  // Filter exceptions based on selection
+  const displayedNdrs = ndrItems.filter(ndr => filterMode === 'ALL' ? true : ndr.isLocal === true);
+
   return (
     <div className="p-6 max-w-7xl mx-auto font-sans">
       
@@ -93,15 +99,25 @@ export default function NdrDashboard() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => fetchNdrList(true)}
-          disabled={loading || refreshing}
-          className="self-start md:self-center flex items-center justify-center gap-2 px-5 py-3 bg-[#1B3022] hover:bg-brand disabled:bg-brand/40 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer"
-        >
-          <RefreshCw size={14} className={`${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Refreshing..." : "Sync Exceptions"}
-        </button>
+        <div className="flex items-center gap-3 self-start md:self-center">
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value as 'LOCAL' | 'ALL')}
+            className="bg-white border border-[#1B3022]/10 text-[#1B3022] font-bold text-xs uppercase tracking-wider rounded-xl px-4 py-3 focus:outline-none focus:border-[#C5A059] transition-all cursor-pointer shadow-xs"
+          >
+            <option value="LOCAL">Nuts Spice Co NDRs</option>
+            <option value="ALL">All NDRs</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => fetchNdrList(true)}
+            disabled={loading || refreshing}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-[#1B3022] hover:bg-brand disabled:bg-brand/40 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+          >
+            <RefreshCw size={14} className={`${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Sync Exceptions"}
+          </button>
+        </div>
       </div>
 
       {/* Info Warning Bar */}
@@ -137,14 +153,16 @@ export default function NdrDashboard() {
             Retry Connection
           </button>
         </div>
-      ) : ndrItems.length === 0 ? (
+      ) : displayedNdrs.length === 0 ? (
         <div className="bg-white rounded-3xl p-16 text-center border border-brand/5 shadow-sm">
           <div className="w-12 h-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Truck size={24} />
           </div>
           <h2 className="text-xl font-playfair font-bold text-brand mb-2">Zero Exceptions Found</h2>
           <p className="text-brand/40 text-sm font-medium max-w-md mx-auto">
-            All Xpressbees shipments are moving smoothly! There are no outstanding NDR exceptions requiring administrator action.
+            {filterMode === 'LOCAL'
+              ? "All storefront shipments are moving smoothly! No active exceptions belong to Nuts Spice Co."
+              : "All Xpressbees shipments are moving smoothly! There are no outstanding NDR exceptions requiring administrator action."}
           </p>
         </div>
       ) : (
@@ -163,17 +181,23 @@ export default function NdrDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand/5">
-                {ndrItems.map((item) => (
+                {displayedNdrs.map((item) => (
                   <tr key={item.awbNumber} className="hover:bg-brand/[0.005] transition-colors">
                     <td className="px-6 py-4.5 whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="font-mono text-sm font-bold text-brand">{item.awbNumber}</span>
-                        <a 
-                          href={`/admin/orders?search=${item.awbNumber}`}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold text-[#C5A059] hover:underline mt-1"
-                        >
-                          View Order <ExternalLink size={10} />
-                        </a>
+                        {item.isLocal && item.orderId ? (
+                          <Link 
+                            href={`/admin/orders/${item.orderId}`}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-[#C5A059] hover:underline mt-1"
+                          >
+                            View Order <ExternalLink size={10} />
+                          </Link>
+                        ) : (
+                          <span className="text-[10px] text-brand/30 font-bold mt-1 select-none">
+                            External Courier NDR
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4.5 whitespace-nowrap">
@@ -252,10 +276,10 @@ export default function NdrDashboard() {
               </tbody>
             </table>
           </div>
-
+ 
           {/* Cards for mobile view */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-4">
-            {ndrItems.map((item) => (
+            {displayedNdrs.map((item) => (
               <div 
                 key={item.awbNumber}
                 className="bg-white rounded-2xl border border-brand/5 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
@@ -267,7 +291,7 @@ export default function NdrDashboard() {
                       {item.attempts} {item.attempts === 1 ? "attempt" : "attempts"}
                     </span>
                   </div>
-
+ 
                   <div className="space-y-3 mb-5">
                     <div className="flex items-center gap-2 text-xs font-semibold text-brand/40">
                       <Calendar size={14} className="text-[#C5A059]" />
@@ -283,7 +307,7 @@ export default function NdrDashboard() {
                         {item.reason}
                       </p>
                     </div>
-
+ 
                     {/* NDR Audit Resolutions History Timeline Mobile */}
                     {item.ndrResolutions && item.ndrResolutions.length > 0 && (
                       <div className="pl-3.5 border-l-2 border-emerald-500/40 space-y-2 mt-3 animate-in fade-in duration-200">
@@ -319,14 +343,20 @@ export default function NdrDashboard() {
                     )}
                   </div>
                 </div>
-
+ 
                 <div className="flex items-center justify-between gap-4 pt-3.5 border-t border-brand/5">
-                  <a 
-                    href={`/admin/orders?search=${item.awbNumber}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#C5A059] hover:underline"
-                  >
-                    View Order <ExternalLink size={12} />
-                  </a>
+                  {item.isLocal && item.orderId ? (
+                    <Link 
+                      href={`/admin/orders/${item.orderId}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#C5A059] hover:underline"
+                    >
+                      View Order <ExternalLink size={12} />
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-brand/30 font-bold select-none">
+                      External Courier NDR
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleResolveClick(item.awbNumber, item.reason)}
