@@ -30,19 +30,6 @@ interface ShippingDimensionsModalProps {
   order?: any;
 }
 
-const PACKAGE_DIMENSIONS: Record<number, { L: number; B: number; H: number }> = {
-  0.5 : { L: 10, B: 10, H: 10 },
-  1 : { L: 20, B: 20, H: 20 },
-  1.5 : { L: 30, B: 30, H: 30 },
-  2 : { L: 40, B: 40, H: 40 },
-};
-
-function getDimensionsForWeight(weightInKg: number) {
-  const keys = [0.5, 1, 1.5, 2];
-  const matchedKey = keys.find(k => k >= weightInKg) || 2;
-  return PACKAGE_DIMENSIONS[matchedKey as keyof typeof PACKAGE_DIMENSIONS];
-}
-
 function parseWeightToKg(sizeStr: string): number {
   if (!sizeStr) return 0.5;
   const clean = sizeStr.toLowerCase().trim();
@@ -104,22 +91,68 @@ export default function ShippingDimensionsModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fill calculated weight and dimensions on modal mount/open
+  const [isTiersLoaded, setIsTiersLoaded] = useState(false);
+  const [dbTiers, setDbTiers] = useState<any[]>([]);
+  const [isReady, setIsReady] = useState(false);
+
+  // Fetch database package tiers on mount
   useEffect(() => {
-    if (!isOpen || !order) return;
+    const fetchPackageTiers = async () => {
+      try {
+        const res = await fetch("/api/admin/settings/package-tiers");
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setDbTiers(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to load package tiers in dimensions modal:", err);
+      } finally {
+        setIsTiersLoaded(true);
+      }
+    };
+    fetchPackageTiers();
+  }, []);
+
+  // Auto-fill calculated weight and dimensions on modal mount/open once tiers are loaded
+  useEffect(() => {
+    if (!isOpen || !order || !isTiersLoaded) {
+      if (!isOpen) {
+        setIsReady(false);
+      }
+      return;
+    }
     
     const calculatedW = calculateTotalWeight(order.items);
-    const dimensions = getDimensionsForWeight(calculatedW);
-    
     setWeight(String(calculatedW));
-    setLength(String(dimensions.L));
-    setBreadth(String(dimensions.B));
-    setHeight(String(dimensions.H));
-  }, [isOpen, order]);
+
+    const totalWeightGrams = calculatedW * 1000;
+    
+    if (dbTiers.length > 0) {
+      const matchedTier = dbTiers.find(t => t.maxWeightGrams >= totalWeightGrams);
+      if (matchedTier) {
+        setLength(String(matchedTier.lengthCm));
+        setBreadth(String(matchedTier.breadthCm));
+        setHeight(String(matchedTier.heightCm));
+      } else {
+        // Oversized Fallback: select the largest tier and scale dimensions proportionally
+        const largestTier = dbTiers[dbTiers.length - 1];
+        const ratio = totalWeightGrams / largestTier.maxWeightGrams;
+        setLength(String(Math.ceil(largestTier.lengthCm * ratio)));
+        setBreadth(String(Math.ceil(largestTier.breadthCm * ratio)));
+        setHeight(String(Math.ceil(largestTier.heightCm * ratio)));
+      }
+    } else {
+      // Fallback if no database tiers exist
+      setLength("10");
+      setBreadth("10");
+      setHeight("10");
+    }
+    setIsReady(true);
+  }, [isOpen, order, isTiersLoaded, dbTiers]);
 
   // Fetch live shipping rates whenever weight or dimensions change, with 500ms debounce
   useEffect(() => {
-    if (!isOpen || !order) return;
+    if (!isOpen || !order || !isReady) return;
 
     const pincode = extractPincode(order.shippingAddress || "");
     if (!pincode) {
@@ -204,7 +237,7 @@ export default function ShippingDimensionsModal({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [isOpen, weight, length, breadth, height, order?.shippingAddress]);
+  }, [isOpen, weight, length, breadth, height, order?.shippingAddress, isReady]);
 
   if (!isOpen) return null;
 
