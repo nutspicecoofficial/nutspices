@@ -56,10 +56,7 @@ export async function PATCH(
         return NextResponse.json({ success: false, error: "No active shipment found to cancel." }, { status: 400 });
       }
 
-      // 1. Call Xpressbees API. Let errors bubble up to reject state updates
-      await cancelShipment(order.awbNumber);
-
-      // 2. Build the updated shipping details log
+      // 1. Build the updated shipping details log
       let currentDetails: any = {};
       if (order.shippingDetails) {
         try {
@@ -69,6 +66,11 @@ export async function PATCH(
         } catch {
           currentDetails = { raw: order.shippingDetails };
         }
+      }
+
+      // 2. Call Xpressbees API if not manual. Let errors bubble up to reject state updates
+      if (currentDetails?.mode !== "MANUAL" && currentDetails?.isManualFulfillment !== true) {
+        await cancelShipment(order.awbNumber);
       }
 
       const cancelledHistory = [...(currentDetails.cancelledAwbs || [])];
@@ -127,7 +129,19 @@ export async function PATCH(
       // If AWB was already booked, request cancellation from courier
       if (order.awbNumber) {
         try {
-          await cancelShipment(order.awbNumber);
+          let currentDetails: any = {};
+          if (order.shippingDetails) {
+            try {
+              currentDetails = typeof order.shippingDetails === "string"
+                ? JSON.parse(order.shippingDetails)
+                : order.shippingDetails;
+            } catch {
+              currentDetails = {};
+            }
+          }
+          if (currentDetails?.mode !== "MANUAL" && currentDetails?.isManualFulfillment !== true) {
+            await cancelShipment(order.awbNumber);
+          }
           updates.shippingStatus = "SHIPMENT_CANCELLED";
         } catch (shipmentCancelErr: any) {
           console.error("Warning: Failed to cancel courier shipment during cancellation transition:", shipmentCancelErr);
@@ -156,63 +170,104 @@ export async function PATCH(
         );
       }
 
-      // Fetch order items and join products to get correct names
-      const items = await db
-        .select({
-          id: orderItems.id,
-          productId: orderItems.productId,
-          quantity: orderItems.quantity,
-          price: orderItems.price,
-          size: orderItems.size,
-          color: orderItems.color,
-          customizations: orderItems.customizations,
-          productName: products.name
-        })
-        .from(orderItems)
-        .leftJoin(products, eq(orderItems.productId, products.id))
-        .where(eq(orderItems.orderId, orderId));
+      const isManual = packageDetails?.mode === "MANUAL" || body.mode === "MANUAL";
+      const manualDetails = packageDetails?.manualDetails || body.manualDetails;
 
-      // Call shipping adapter (which routes to Xpressbees when mock mode is disabled)
-      const shipmentRes = await generateShipment({
-        order,
-        items,
-        packageDetails
-      });
-
-      if (!shipmentRes || !shipmentRes.success || !shipmentRes.awbNumber) {
-        throw new Error("Shipment generation adapter returned failure status.");
-      }
-
-      let currentDetails: any = {};
-      if (order.shippingDetails) {
-        try {
-          currentDetails = typeof order.shippingDetails === "string"
-            ? JSON.parse(order.shippingDetails)
-            : order.shippingDetails;
-        } catch {
-          currentDetails = { raw: order.shippingDetails };
+      if (isManual) {
+        if (!manualDetails || !manualDetails.courierName || !manualDetails.awbNumber) {
+          return NextResponse.json(
+            { success: false, error: "Manual courier name and AWB number are required." },
+            { status: 400 }
+          );
         }
+
+        let currentDetails: any = {};
+        if (order.shippingDetails) {
+          try {
+            currentDetails = typeof order.shippingDetails === "string"
+              ? JSON.parse(order.shippingDetails)
+              : order.shippingDetails;
+          } catch {
+            currentDetails = { raw: order.shippingDetails };
+          }
+        }
+
+        const mergedDetails = {
+          ...currentDetails,
+          isManualFulfillment: true,
+          mode: "MANUAL",
+          courierName: manualDetails.courierName,
+          awbNumber: manualDetails.awbNumber,
+          trackingUrl: manualDetails.trackingUrl || "",
+          courierContact: manualDetails.courierContact || "",
+          generatedAt: new Date().toISOString(),
+          invoiceNumber: packageDetails?.invoiceNumber || body.invoiceNumber || null,
+          invoiceDate: packageDetails?.invoiceDate || body.invoiceDate || null
+        };
+
+        updates.awbNumber = manualDetails.awbNumber;
+        updates.shippingStatus = "3_AWB_GENERATED";
+        updates.status = "Shipped";
+        updates.shippingDetails = JSON.stringify(mergedDetails);
+      } else {
+        // Fetch order items and join products to get correct names
+        const items = await db
+          .select({
+            id: orderItems.id,
+            productId: orderItems.productId,
+            quantity: orderItems.quantity,
+            price: orderItems.price,
+            size: orderItems.size,
+            color: orderItems.color,
+            customizations: orderItems.customizations,
+            productName: products.name
+          })
+          .from(orderItems)
+          .leftJoin(products, eq(orderItems.productId, products.id))
+          .where(eq(orderItems.orderId, orderId));
+
+        // Call shipping adapter (which routes to Xpressbees when mock mode is disabled)
+        const shipmentRes = await generateShipment({
+          order,
+          items,
+          packageDetails
+        });
+
+        if (!shipmentRes || !shipmentRes.success || !shipmentRes.awbNumber) {
+          throw new Error("Shipment generation adapter returned failure status.");
+        }
+
+        let currentDetails: any = {};
+        if (order.shippingDetails) {
+          try {
+            currentDetails = typeof order.shippingDetails === "string"
+              ? JSON.parse(order.shippingDetails)
+              : order.shippingDetails;
+          } catch {
+            currentDetails = { raw: order.shippingDetails };
+          }
+        }
+
+        const mergedDetails = {
+          ...currentDetails,
+          courierName: shipmentRes.courierName || "Xpressbees",
+          labelUrl: shipmentRes.labelUrl || "",
+          estimatedDelivery: shipmentRes.estimatedDelivery || "",
+          generatedAt: new Date().toISOString(),
+          weight: packageDetails?.weight || null,
+          length: packageDetails?.length || null,
+          breadth: packageDetails?.breadth !== undefined ? packageDetails.breadth : (packageDetails?.width !== undefined ? packageDetails.width : null),
+          height: packageDetails?.height || null,
+          invoiceNumber: packageDetails?.invoiceNumber || null,
+          invoiceDate: packageDetails?.invoiceDate || null,
+          courierId: packageDetails?.courierId || null
+        };
+
+        updates.awbNumber = shipmentRes.awbNumber;
+        updates.shippingStatus = "3_AWB_GENERATED";
+        updates.status = "Shipped";
+        updates.shippingDetails = JSON.stringify(mergedDetails);
       }
-
-      const mergedDetails = {
-        ...currentDetails,
-        courierName: shipmentRes.courierName || "Xpressbees",
-        labelUrl: shipmentRes.labelUrl || "",
-        estimatedDelivery: shipmentRes.estimatedDelivery || "",
-        generatedAt: new Date().toISOString(),
-        weight: packageDetails?.weight || null,
-        length: packageDetails?.length || null,
-        breadth: packageDetails?.breadth !== undefined ? packageDetails.breadth : (packageDetails?.width !== undefined ? packageDetails.width : null),
-        height: packageDetails?.height || null,
-        invoiceNumber: packageDetails?.invoiceNumber || null,
-        invoiceDate: packageDetails?.invoiceDate || null,
-        courierId: packageDetails?.courierId || null
-      };
-
-      updates.awbNumber = shipmentRes.awbNumber;
-      updates.shippingStatus = "3_AWB_GENERATED";
-      updates.status = "Shipped";
-      updates.shippingDetails = JSON.stringify(mergedDetails);
     } 
     // 4. Trigger Pickup Booking (4_PICKUP_REQUESTED)
     else if (shippingStatus === "4_PICKUP_REQUESTED") {
@@ -224,37 +279,49 @@ export async function PATCH(
         );
       }
 
-      // Call requestPickup adapter
-      const pickupRes = await requestPickup({
-        awbNumber: activeAwb
-      });
-
-      if (!pickupRes || !pickupRes.success) {
-        throw new Error("Courier scheduling pickup request returned failure status.");
-      }
-
-      updates.shippingStatus = "4_PICKUP_REQUESTED";
-      updates.status = "Shipped";
-
       // Parse current shipping details to merge pickup token/date details
       let currentDetails: any = {};
       const targetDetails = updates.shippingDetails || order.shippingDetails;
       if (targetDetails) {
         try {
-          currentDetails = JSON.parse(targetDetails);
+          currentDetails = typeof targetDetails === "string" ? JSON.parse(targetDetails) : targetDetails;
         } catch {
           currentDetails = { raw: targetDetails };
         }
       }
 
-      updates.shippingDetails = JSON.stringify({
-        ...currentDetails,
-        pickupToken: pickupRes.pickupToken,
-        scheduledDate: pickupRes.scheduledDate,
-        pickupMessage: pickupRes.message,
-        manifestUrl: pickupRes.manifestUrl || currentDetails.manifestUrl || "",
-        pickupRequestedAt: new Date().toISOString()
-      });
+      if (currentDetails?.mode === "MANUAL" || currentDetails?.isManualFulfillment === true) {
+        updates.shippingStatus = "4_PICKUP_REQUESTED";
+        updates.status = "Shipped";
+        updates.shippingDetails = JSON.stringify({
+          ...currentDetails,
+          pickupToken: "MANUAL_PICKUP",
+          scheduledDate: new Date().toISOString().split("T")[0],
+          pickupMessage: "Manual pickup handled locally.",
+          pickupRequestedAt: new Date().toISOString()
+        });
+      } else {
+        // Call requestPickup adapter
+        const pickupRes = await requestPickup({
+          awbNumber: activeAwb
+        });
+
+        if (!pickupRes || !pickupRes.success) {
+          throw new Error("Courier scheduling pickup request returned failure status.");
+        }
+
+        updates.shippingStatus = "4_PICKUP_REQUESTED";
+        updates.status = "Shipped";
+
+        updates.shippingDetails = JSON.stringify({
+          ...currentDetails,
+          pickupToken: pickupRes.pickupToken,
+          scheduledDate: pickupRes.scheduledDate,
+          pickupMessage: pickupRes.message,
+          manifestUrl: pickupRes.manifestUrl || currentDetails.manifestUrl || "",
+          pickupRequestedAt: new Date().toISOString()
+        });
+      }
     } 
     // Standard shippingStatus updates mapping to general status
     else if (shippingStatus) {
@@ -279,7 +346,7 @@ export async function PATCH(
           updates.shippingDetails = null;
         }
 
-        if (order.awbNumber) {
+        if (order.awbNumber && currentDetails?.mode !== "MANUAL" && currentDetails?.isManualFulfillment !== true) {
           try {
             await cancelShipment(order.awbNumber);
           } catch (shipmentCancelErr: any) {

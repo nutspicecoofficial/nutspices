@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, XCircle, AlertTriangle, Image as ImageIcon, MapPin, Check, X, Truck, Plane, Bike, CheckSquare, Cog } from "lucide-react";
+import { ShoppingBag, Loader2, Package, CheckCircle2, Clock, Ruler, XCircle, AlertTriangle, Image as ImageIcon, MapPin, Check, X, Truck, Plane, Bike, CheckSquare, Cog, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 interface OrderItem {
@@ -26,6 +26,9 @@ interface Order {
   paymentId?: string | null;
   customerPhone?: string | null;
   cancelReason?: string | null;
+  awbNumber?: string | null;
+  shippingDetails?: string | null;
+  shippingStatus?: string | null;
   items: OrderItem[];
 }
 
@@ -122,18 +125,53 @@ export default function MyOrdersPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden transition-all duration-500 group">
-              <div className="p-5 md:p-6 bg-brand flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-white/10 rounded-2xl text-white">
-                    <Package size={20} />
+          {orders.map((order) => {
+            const parsedDetails = (() => {
+              if (!order.shippingDetails) return null;
+              try {
+                return typeof order.shippingDetails === "string"
+                  ? JSON.parse(order.shippingDetails)
+                  : order.shippingDetails;
+              } catch {
+                return null;
+              }
+            })();
+
+            const trackingId = order.awbNumber || parsedDetails?.awbNumber;
+            const isManual = parsedDetails?.isManualFulfillment === true;
+            const courierName = isManual ? (parsedDetails?.courierName || "Courier") : "XpressBees";
+            const trackingLink = isManual
+              ? parsedDetails?.trackingUrl
+              : `https://ship.xpressbees.com/tracking?awb=${trackingId}`;
+
+            return (
+              <div key={order.id} className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden transition-all duration-500 group">
+                <div className="p-5 md:p-6 bg-brand flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-white/10 rounded-2xl text-white">
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black tracking-widest uppercase mb-1">Order #NS-{order.id}</h4>
+                      <p className="text-xs font-medium text-white/70">NutspiceCo Selection</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-black tracking-widest uppercase mb-1">Order #NS-{order.id}</h4>
-                    <p className="text-xs font-medium text-white/70">NutspiceCo Selection</p>
-                  </div>
-                </div>
+
+                  {/* Dynamic tracking link badge */}
+                  {trackingId && (
+                    <div className="flex-1 md:ml-8 md:mr-auto flex justify-start">
+                      <a
+                        href={trackingLink || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 transition-colors border border-white/20 text-white px-4 py-2 rounded-lg text-xs font-medium tracking-wide cursor-pointer"
+                      >
+                        <Truck size={14} />
+                        <span>Track via {courierName}: {trackingId}</span>
+                        <ExternalLink size={12} className="opacity-75" />
+                      </a>
+                    </div>
+                  )}
 
                 <div className="flex flex-wrap items-center gap-6 md:gap-10">
                   <div className="flex flex-col min-w-[80px]">
@@ -385,7 +423,8 @@ export default function MyOrdersPage() {
 
               </div>
               </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {/* Floating Toast Notification */}

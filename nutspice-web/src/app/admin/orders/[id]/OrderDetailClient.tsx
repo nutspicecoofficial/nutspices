@@ -213,16 +213,21 @@ export default function OrderDetailClient({
         <div>
           <p className="text-[8px] font-black text-brand/35 uppercase tracking-wider mb-1">Airway Bill (AWB)</p>
           {order.awbNumber ? (
-            <a
-              href={`https://www.xpressbees.com/track?awb=${order.awbNumber}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#C5A059] font-bold text-xs hover:underline flex items-center gap-1.5"
-              title="Track with Xpressbees"
-            >
-              {order.awbNumber}
-              <span className="text-[8px] px-1 bg-[#C5A059]/10 rounded font-normal uppercase">Track ↗</span>
-            </a>
+            (() => {
+              const isManual = parsedShippingDetails?.isManualFulfillment === true;
+              return (
+                <a
+                  href={isManual ? (parsedShippingDetails?.trackingUrl || "#") : `https://www.xpressbees.com/track?awb=${order.awbNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#C5A059] font-bold text-xs hover:underline flex items-center gap-1.5 cursor-pointer"
+                  title={isManual ? `Track with ${parsedShippingDetails?.courierName || "courier"}` : "Track with Xpressbees"}
+                >
+                  {order.awbNumber}
+                  <span className="text-[8px] px-1 bg-[#C5A059]/10 rounded font-normal uppercase">Track ↗</span>
+                </a>
+              );
+            })()
           ) : (
             <span className="text-brand/30 text-xs font-semibold">Not Allocated</span>
           )}
@@ -292,109 +297,197 @@ export default function OrderDetailClient({
           </div>
 
           {/* Shipping details and documents */}
-          {(parsedShippingDetails?.invoiceNumber || labelUrl || manifestUrl || order.awbNumber) && (
-            <div>
-              <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping details & Documents</h4>
-              <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs relative">
-                
-                {/* Cancel Shipment Button with Slide-out Animation & Tooltip */}
-                {order.awbNumber && order.shippingStatus !== "DELIVERED" && (
-                  <div className="absolute bottom-5 right-5 group">
-                    <button
-                      type="button"
-                      onClick={() => setCancelModalOpen(true)}
-                      className="flex items-center gap-0 hover:gap-2 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all duration-300 ease-out cursor-pointer overflow-hidden max-w-[34px] hover:max-w-[150px] group/btn shadow-xs"
-                    >
-                      <span className="text-[9px] font-black uppercase tracking-wider text-rose-600 opacity-0 group-hover/btn:opacity-100 max-w-0 group-hover/btn:max-w-[100px] transition-all duration-300 ease-out overflow-hidden whitespace-nowrap">
-                        Cancel Shipment
-                      </span>
-                      <XCircle size={16} className="shrink-0" />
-                    </button>
-                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-[#1B3022] text-white text-[10px] normal-case tracking-normal font-medium rounded-lg shadow-lg z-35 pointer-events-none text-center leading-relaxed">
-                      Cancel this Xpressbees shipment. Order will return to Processing state.
-                      <div className="absolute top-full right-3 w-1.5 h-1.5 bg-[#1B3022] rotate-45 -translate-y-0.5"></div>
-                    </div>
-                  </div>
-                )}
-                <FileText size={18} className="text-[#C5A059] shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
-                    <div>
-                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
-                        Invoice Number
-                      </span>
-                      <span className="text-xs font-bold text-brand font-mono">
-                        {parsedShippingDetails?.invoiceNumber || "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
-                        Invoice Date
-                      </span>
-                      <span className="text-xs font-bold text-brand">
-                        {parsedShippingDetails?.invoiceDate ? new Date(parsedShippingDetails.invoiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
-                        Weight
-                      </span>
-                      <span className="text-xs font-bold text-brand">
-                        {(() => {
-                          const w = parsedShippingDetails?.weight;
-                          if (w === undefined || w === null || w === "") return "N/A";
-                          const val = parseFloat(w);
-                          if (isNaN(val)) return "N/A";
-                          return val < 15 ? `${val} kg` : `${val} g`;
-                        })()}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
-                        Dimensions
-                      </span>
-                      <span className="text-xs font-bold text-brand">
-                        {(() => {
-                          const l = parsedShippingDetails?.length;
-                          const w = parsedShippingDetails?.breadth || parsedShippingDetails?.width;
-                          const h = parsedShippingDetails?.height;
-                          if (!l && !w && !h) return "N/A";
-                          return `${l || "N/A"} x ${w || "N/A"} x ${h || "N/A"} cm`;
-                        })()}
-                      </span>
-                    </div>
-                  </div>
+          {(parsedShippingDetails?.invoiceNumber || labelUrl || manifestUrl || order.awbNumber || parsedShippingDetails?.isManualFulfillment) && (
+            (() => {
+              const isManual = parsedShippingDetails?.isManualFulfillment === true;
+              const displayCourierName = isManual ? (parsedShippingDetails?.courierName || 'Manual Courier') : 'XpressBees';
+              return (
+                <div>
+                  <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Shipping details & Documents</h4>
+                  <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs relative">
+                    
+                    {/* Cancel Shipment Button with Slide-out Animation & Tooltip */}
+                    {order.awbNumber && order.shippingStatus !== "DELIVERED" && (
+                      <div className="absolute bottom-5 right-5 group">
+                        <button
+                          type="button"
+                          onClick={() => setCancelModalOpen(true)}
+                          className="flex items-center gap-0 hover:gap-2 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all duration-300 ease-out cursor-pointer overflow-hidden max-w-[34px] hover:max-w-[150px] group/btn shadow-xs"
+                        >
+                          <span className="text-[9px] font-black uppercase tracking-wider text-rose-600 opacity-0 group-hover/btn:opacity-100 max-w-0 group-hover/btn:max-w-[100px] transition-all duration-300 ease-out overflow-hidden whitespace-nowrap">
+                            Cancel Shipment
+                          </span>
+                          <XCircle size={16} className="shrink-0" />
+                        </button>
+                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-[#1B3022] text-white text-[10px] normal-case tracking-normal font-medium rounded-lg shadow-lg z-35 pointer-events-none text-center leading-relaxed">
+                          {isManual 
+                            ? "Cancel this manual shipment. Order will return to Processing state."
+                            : "Cancel this Xpressbees shipment. Order will return to Processing state."}
+                          <div className="absolute top-full right-3 w-1.5 h-1.5 bg-[#1B3022] rotate-45 -translate-y-0.5"></div>
+                        </div>
+                      </div>
+                    )}
+                    <FileText size={18} className="text-[#C5A059] shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      {isManual ? (
+                        /* Manual Fulfillment UI Grid */
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Courier Name
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {displayCourierName}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Tracking ID / AWB
+                            </span>
+                            <span className="text-xs font-bold text-brand font-mono">
+                              {parsedShippingDetails?.awbNumber || order.awbNumber || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Courier Contact
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {parsedShippingDetails?.courierContact || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Invoice Number
+                            </span>
+                            <span className="text-xs font-bold text-brand font-mono">
+                              {parsedShippingDetails?.invoiceNumber || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Invoice Date
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {parsedShippingDetails?.invoiceDate ? new Date(parsedShippingDetails.invoiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Standard Automated Fulfillment UI Grid */
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Invoice Number
+                            </span>
+                            <span className="text-xs font-bold text-brand font-mono">
+                              {parsedShippingDetails?.invoiceNumber || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Invoice Date
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {parsedShippingDetails?.invoiceDate ? new Date(parsedShippingDetails.invoiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Weight
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {(() => {
+                                const w = parsedShippingDetails?.weight;
+                                if (w === undefined || w === null || w === "") return "N/A";
+                                const val = parseFloat(w);
+                                if (isNaN(val)) return "N/A";
+                                return val < 15 ? `${val} kg` : `${val} g`;
+                              })()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Dimensions
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {(() => {
+                                const l = parsedShippingDetails?.length;
+                                const w = parsedShippingDetails?.breadth || parsedShippingDetails?.width;
+                                const h = parsedShippingDetails?.height;
+                                if (!l && !w && !h) return "N/A";
+                                return `${l || "N/A"} x ${w || "N/A"} x ${h || "N/A"} cm`;
+                              })()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Courier Name
+                            </span>
+                            <span className="text-xs font-bold text-brand">
+                              {displayCourierName}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-brand/40 uppercase tracking-widest mb-1">
+                              Courier ID
+                            </span>
+                            <span className="text-xs font-bold text-brand font-mono">
+                              {parsedShippingDetails?.courierId || "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Documents */}
-                  {(labelUrl || manifestUrl) && (
-                    <div className="flex flex-wrap gap-3.5 pt-4 border-t border-brand/5">
-                      {labelUrl && (
-                        <a
-                          href={labelUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors shadow-xs cursor-pointer"
-                        >
-                          <Download size={14} />
-                          Order Label
-                        </a>
-                      )}
-                      {manifestUrl && (
-                        <a
-                          href={manifestUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors shadow-xs cursor-pointer"
-                        >
-                          <Download size={14} />
-                          View Manifest
-                        </a>
+                      {/* Documents / Actions */}
+                      {isManual ? (
+                        <div className="flex flex-wrap gap-3.5 pt-4 border-t border-brand/5">
+                          <a
+                            href={parsedShippingDetails?.trackingUrl || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors shadow-xs cursor-pointer border border-brand/5 ${
+                              parsedShippingDetails?.trackingUrl
+                                ? "bg-brand/5 hover:bg-brand/10 text-brand"
+                                : "bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none"
+                            }`}
+                          >
+                            Track Shipment
+                          </a>
+                        </div>
+                      ) : (
+                        (labelUrl || manifestUrl) && (
+                          <div className="flex flex-wrap gap-3.5 pt-4 border-t border-brand/5">
+                            {labelUrl && (
+                              <a
+                                href={labelUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors shadow-xs cursor-pointer"
+                              >
+                                <Download size={14} />
+                                Order Label
+                              </a>
+                            )}
+                            {manifestUrl && (
+                              <a
+                                href={manifestUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors shadow-xs cursor-pointer"
+                              >
+                                <Download size={14} />
+                                View Manifest
+                              </a>
+                            )}
+                          </div>
+                        )
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()
           )}
 
         </div>

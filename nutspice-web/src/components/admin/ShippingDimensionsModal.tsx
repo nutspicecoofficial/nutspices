@@ -79,6 +79,12 @@ export default function ShippingDimensionsModal({
   orderId,
   order
 }: ShippingDimensionsModalProps) {
+  const [fulfillmentMode, setFulfillmentMode] = useState<'XPRESSBEES' | 'MANUAL'>('XPRESSBEES');
+  const [manualCourierName, setManualCourierName] = useState("");
+  const [manualAwbNumber, setManualAwbNumber] = useState("");
+  const [manualTrackingUrl, setManualTrackingUrl] = useState("");
+  const [manualCourierContact, setManualCourierContact] = useState("");
+
   const [weight, setWeight] = useState("0.5");
   const [length, setLength] = useState("10");
   const [breadth, setBreadth] = useState("10"); // Breadth maps to width
@@ -152,7 +158,7 @@ export default function ShippingDimensionsModal({
 
   // Fetch live shipping rates whenever weight or dimensions change, with 500ms debounce
   useEffect(() => {
-    if (!isOpen || !order || !isReady) return;
+    if (!isOpen || !order || !isReady || fulfillmentMode === "MANUAL") return;
 
     const pincode = extractPincode(order.shippingAddress || "");
     if (!pincode) {
@@ -243,46 +249,80 @@ export default function ShippingDimensionsModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const w = parseFloat(weight);
-    const l = parseFloat(length);
-    const b = parseFloat(breadth);
-    const h = parseFloat(height);
-
-    if (isNaN(w) || w <= 0 || isNaN(l) || l <= 0 || isNaN(b) || b <= 0 || isNaN(h) || h <= 0) {
-      setError("Please verify packaging dimension inputs. All numbers must be greater than 0.");
-      return;
-    }
-
-    if (!invoiceNumber.trim()) {
-      setError("Please enter a valid invoice number.");
-      return;
-    }
-
-    if (!invoiceDate) {
-      setError("Please select an invoice date.");
-      return;
-    }
-
-    if (!selectedCourier) {
-      setError("Please select a courier service.");
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
+
     try {
-      await onConfirm(
-        { 
-          weight: w, 
-          length: l, 
-          width: b, 
-          height: h, 
-          invoiceNumber, 
-          invoiceDate, 
-          courierId: selectedCourier 
-        }, 
-        selectedCourier
-      );
+      if (fulfillmentMode === "XPRESSBEES") {
+        const w = parseFloat(weight);
+        const l = parseFloat(length);
+        const b = parseFloat(breadth);
+        const h = parseFloat(height);
+
+        if (isNaN(w) || w <= 0 || isNaN(l) || l <= 0 || isNaN(b) || b <= 0 || isNaN(h) || h <= 0) {
+          setError("Please verify packaging dimension inputs. All numbers must be greater than 0.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!invoiceNumber.trim()) {
+          setError("Please enter a valid invoice number.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!invoiceDate) {
+          setError("Please select an invoice date.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!selectedCourier) {
+          setError("Please select a courier service.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        await onConfirm(
+          { 
+            weight: w, 
+            length: l, 
+            width: b, 
+            height: h, 
+            invoiceNumber, 
+            invoiceDate, 
+            courierId: selectedCourier 
+          }, 
+          selectedCourier
+        );
+      } else {
+        if (!manualCourierName.trim()) {
+          setError("Please enter a courier name.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!manualAwbNumber.trim()) {
+          setError("Please enter a tracking ID / AWB.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        await onConfirm(
+          {
+            mode: "MANUAL",
+            manualDetails: {
+              courierName: manualCourierName.trim(),
+              awbNumber: manualAwbNumber.trim(),
+              trackingUrl: manualTrackingUrl.trim() || undefined,
+              courierContact: manualCourierContact.trim() || undefined
+            },
+            invoiceNumber: invoiceNumber.trim() || undefined,
+            invoiceDate: invoiceDate || undefined
+          } as any,
+          ""
+        );
+      }
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate shipment.");
@@ -324,60 +364,142 @@ export default function ShippingDimensionsModal({
             </div>
           )}
 
-          {/* Package details */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/5 pb-2">
-              Packaging Dimensions
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Length (cm)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
-                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Breadth (cm)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={breadth}
-                  onChange={(e) => setBreadth(e.target.value)}
-                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Height (cm)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
-                  required
-                />
-              </div>
+          {/* Fulfillment Mode Toggle */}
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Fulfillment Mode</label>
+            <div className="grid grid-cols-2 gap-2 bg-brand/5 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setFulfillmentMode("XPRESSBEES")}
+                className={`py-2 px-3 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+                  fulfillmentMode === "XPRESSBEES"
+                    ? "bg-brand text-white shadow-xs cursor-pointer"
+                    : "text-brand/60 hover:text-brand hover:bg-brand/5 cursor-pointer"
+                }`}
+              >
+                XpressBees (Auto)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFulfillmentMode("MANUAL")}
+                className={`py-2 px-3 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+                  fulfillmentMode === "MANUAL"
+                    ? "bg-brand text-white shadow-xs cursor-pointer"
+                    : "text-brand/60 hover:text-brand hover:bg-brand/5 cursor-pointer"
+                }`}
+              >
+                Manual (Local)
+              </button>
             </div>
           </div>
 
-          {/* Invoice Override */}
+          {fulfillmentMode === "XPRESSBEES" ? (
+            /* Packaging Dimensions (Auto mode only) */
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <h3 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/5 pb-2">
+                Packaging Dimensions
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Weight (kg)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "XPRESSBEES"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Length (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={length}
+                    onChange={(e) => setLength(e.target.value)}
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "XPRESSBEES"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Breadth (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={breadth}
+                    onChange={(e) => setBreadth(e.target.value)}
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "XPRESSBEES"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Height (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "XPRESSBEES"}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Manual Courier Details Form */
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <h3 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/5 pb-2">
+                Manual Courier Information
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Courier Name</label>
+                  <input
+                    type="text"
+                    value={manualCourierName}
+                    onChange={(e) => setManualCourierName(e.target.value)}
+                    placeholder="e.g. India Post, DTDC"
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "MANUAL"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Tracking ID / AWB</label>
+                  <input
+                    type="text"
+                    value={manualAwbNumber}
+                    onChange={(e) => setManualAwbNumber(e.target.value)}
+                    placeholder="e.g. IP123456789IN"
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                    required={fulfillmentMode === "MANUAL"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Tracking URL</label>
+                  <input
+                    type="url"
+                    value={manualTrackingUrl}
+                    onChange={(e) => setManualTrackingUrl(e.target.value)}
+                    placeholder="e.g. https://www.indiapost.gov.in/..."
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.2em] mb-2">Courier Contact</label>
+                  <input
+                    type="text"
+                    value={manualCourierContact}
+                    onChange={(e) => setManualCourierContact(e.target.value)}
+                    placeholder="e.g. 1800-266-6868"
+                    className="w-full bg-brand/5 border border-transparent focus:border-brand-accent/50 rounded-xl px-3 py-2.5 text-xs font-semibold text-brand outline-none transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Override (Rendered in both modes) */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-brand uppercase tracking-widest border-b border-brand/5 pb-2">
               Invoice Details Override
@@ -408,105 +530,115 @@ export default function ShippingDimensionsModal({
             </div>
           </div>
 
-          {/* Courier Selection */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-brand/5 pb-2">
-              <h3 className="text-xs font-bold text-brand uppercase tracking-widest">
-                Courier Service Options
-              </h3>
-              {isLoadingRates && (
-                <div className="flex items-center space-x-2 text-[10px] text-brand/40 font-bold uppercase tracking-wider">
-                  <Loader2 size={12} className="animate-spin text-brand-accent" />
-                  <span>Loading Live Rates...</span>
+          {/* Courier Selection (Rendered in Xpressbees mode only) */}
+          {fulfillmentMode === "XPRESSBEES" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-brand/5 pb-2">
+                <h3 className="text-xs font-bold text-brand uppercase tracking-widest">
+                  Courier Service Options
+                </h3>
+                {isLoadingRates && (
+                  <div className="flex items-center space-x-2 text-[10px] text-brand/40 font-bold uppercase tracking-wider">
+                    <Loader2 size={12} className="animate-spin text-brand-accent" />
+                    <span>Loading Live Rates...</span>
+                  </div>
+                )}
+              </div>
+
+              {isLoadingRates ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between animate-pulse">
+                    <div className="space-y-2 flex-grow">
+                      <div className="h-4 bg-brand/10 rounded w-3/4"></div>
+                      <div className="h-3 bg-brand/5 rounded w-1/2"></div>
+                    </div>
+                    <div className="h-4 bg-brand/10 rounded w-12"></div>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between animate-pulse">
+                    <div className="space-y-2 flex-grow">
+                      <div className="h-4 bg-brand/10 rounded w-3/4"></div>
+                      <div className="h-3 bg-brand/5 rounded w-1/2"></div>
+                    </div>
+                    <div className="h-4 bg-brand/10 rounded w-12"></div>
+                  </div>
                 </div>
+              ) : couriers.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {couriers.map((courier) => {
+                    const isSelected = selectedCourier === courier.id;
+                    return (
+                      <div
+                        key={courier.id}
+                        onClick={() => setSelectedCourier(courier.id)}
+                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start justify-between ${
+                          isSelected
+                            ? "border-[#1B3022] bg-[#1B3022]/[0.03] shadow-xs"
+                            : "border-brand/5 hover:border-brand/20 hover:bg-brand/[0.01]"
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Truck size={14} className={isSelected ? "text-brand" : "text-brand/40"} />
+                            <span className="text-xs font-bold text-brand">{courier.name}</span>
+                          </div>
+                          <div className="flex items-center space-x-3 text-[10px] font-medium text-brand/40">
+                            <span>Est: {courier.estimatedDays} days</span>
+                            <span className="flex items-center text-amber-500">
+                              <Star size={10} className="fill-amber-500 mr-0.5" />
+                              {courier.rating}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-brand">₹{courier.charge.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                !isLoadingRates && (
+                  <div className="p-8 bg-brand/5 rounded-2xl text-center border border-dashed border-brand/10">
+                    <p className="text-[10px] font-black text-brand/30 uppercase tracking-widest">
+                      No available shipping services found.
+                    </p>
+                  </div>
+                )
               )}
             </div>
-
-            {isLoadingRates ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between animate-pulse">
-                  <div className="space-y-2 flex-grow">
-                    <div className="h-4 bg-brand/10 rounded w-3/4"></div>
-                    <div className="h-3 bg-brand/5 rounded w-1/2"></div>
-                  </div>
-                  <div className="h-4 bg-brand/10 rounded w-12"></div>
-                </div>
-                <div className="p-4 rounded-2xl border border-brand/10 bg-brand/[0.01] flex items-start justify-between animate-pulse">
-                  <div className="space-y-2 flex-grow">
-                    <div className="h-4 bg-brand/10 rounded w-3/4"></div>
-                    <div className="h-3 bg-brand/5 rounded w-1/2"></div>
-                  </div>
-                  <div className="h-4 bg-brand/10 rounded w-12"></div>
-                </div>
-              </div>
-            ) : couriers.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {couriers.map((courier) => {
-                  const isSelected = selectedCourier === courier.id;
-                  return (
-                    <div
-                      key={courier.id}
-                      onClick={() => setSelectedCourier(courier.id)}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start justify-between ${
-                        isSelected
-                          ? "border-[#1B3022] bg-[#1B3022]/[0.03] shadow-xs"
-                          : "border-brand/5 hover:border-brand/20 hover:bg-brand/[0.01]"
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <Truck size={14} className={isSelected ? "text-brand" : "text-brand/40"} />
-                          <span className="text-xs font-bold text-brand">{courier.name}</span>
-                        </div>
-                        <div className="flex items-center space-x-3 text-[10px] font-medium text-brand/40">
-                          <span>Est: {courier.estimatedDays} days</span>
-                          <span className="flex items-center text-amber-500">
-                            <Star size={10} className="fill-amber-500 mr-0.5" />
-                            {courier.rating}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-brand">₹{courier.charge.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              !isLoadingRates && (
-                <div className="p-8 bg-brand/5 rounded-2xl text-center border border-dashed border-brand/10">
-                  <p className="text-[10px] font-black text-brand/30 uppercase tracking-widest">
-                    No available shipping services found.
-                  </p>
-                </div>
-              )
-            )}
-          </div>
+          )}
 
           {/* Footer Actions */}
           <div className="flex space-x-3 pt-2 border-t border-brand/5">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 px-4 rounded-xl border border-brand/10 text-brand text-xs font-bold uppercase tracking-widest hover:bg-brand/5 transition-all"
+              className="flex-1 py-3 px-4 rounded-xl border border-brand/10 text-brand text-xs font-bold uppercase tracking-widest hover:bg-brand/5 transition-all cursor-pointer"
               disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isLoadingRates || !selectedCourier || isSubmitting}
+              disabled={
+                fulfillmentMode === "XPRESSBEES"
+                  ? (isLoadingRates || !selectedCourier || isSubmitting)
+                  : (isSubmitting || !manualCourierName.trim() || !manualAwbNumber.trim())
+              }
               className={`flex-1 py-3 px-4 rounded-xl text-white text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center space-x-2 ${
-                selectedCourier && !isLoadingRates && !isSubmitting
-                  ? "bg-brand hover:bg-brand-hover shadow-brand/15 cursor-pointer"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                fulfillmentMode === "XPRESSBEES"
+                  ? (selectedCourier && !isLoadingRates && !isSubmitting
+                      ? "bg-brand hover:bg-brand-hover shadow-brand/15 cursor-pointer"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none")
+                  : (!isSubmitting && manualCourierName.trim() && manualAwbNumber.trim()
+                      ? "bg-brand hover:bg-brand-hover shadow-brand/15 cursor-pointer"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none")
               }`}
             >
               {isSubmitting ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
-                <span>Register & Get AWB</span>
+                <span>{fulfillmentMode === "XPRESSBEES" ? "Register & Get AWB" : "Save Manual Shipment"}</span>
               )}
             </button>
           </div>
