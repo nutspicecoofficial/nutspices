@@ -7,6 +7,7 @@ import ShippingDimensionsModal from "@/components/admin/ShippingDimensionsModal"
 import CancelShipmentModal from "@/components/admin/CancelShipmentModal";
 import DowngradeConfirmationModal from "@/components/admin/DowngradeConfirmationModal";
 import NdrActionModal from "@/components/admin/NdrActionModal";
+import EditAddressModal from "@/components/admin/EditAddressModal";
 import { 
   ShoppingBag, 
   Search, 
@@ -26,7 +27,8 @@ import {
   Truck,
   Info,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Pencil
 } from "lucide-react";
 
 type OrderItem = {
@@ -305,6 +307,9 @@ export default function AdminOrders() {
   const [ndrModalOpen, setNdrModalOpen] = useState(false);
   const [ndrAwb, setNdrAwb] = useState("");
   const [ndrRemarks, setNdrRemarks] = useState("");
+  const [activeEditAddressOrderId, setActiveEditAddressOrderId] = useState<number | null>(null);
+  const [activeEditAddressStr, setActiveEditAddressStr] = useState<string | null>(null);
+  const [activeEditAddressPhone, setActiveEditAddressPhone] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -730,9 +735,29 @@ export default function AdminOrders() {
                       <div className="space-y-6">
                         <div>
                           <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Delivery Address</h4>
-                          <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm">
+                          <div className="flex gap-3 p-4 bg-white rounded-2xl border border-brand/5 shadow-sm relative group">
+                            {(!order.awbNumber && 
+                              order.status?.toLowerCase() !== "cancelled" && 
+                              order.orderStatus !== "CANCELLED" && 
+                              (order.shippingStatus || "").toUpperCase() !== "3_AWB_GENERATED" && 
+                              (order.shippingStatus || "").toUpperCase() !== "4_PICKUP_REQUESTED" && 
+                              (order.shippingStatus || "").toUpperCase() !== "DELIVERED") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveEditAddressOrderId(order.id);
+                                  setActiveEditAddressStr(order.shippingAddress || "");
+                                  setActiveEditAddressPhone(order.customerPhone || "");
+                                }}
+                                className="absolute bottom-4 right-4 flex items-center gap-1 px-2 py-1 rounded-lg border border-[#C5A059]/20 bg-[#C5A059]/5 text-[#C5A059] hover:bg-[#C5A059] hover:text-white transition-all duration-200 cursor-pointer shadow-xs font-bold text-[9px] uppercase tracking-wider"
+                                title="Edit shipping address"
+                              >
+                                <Pencil size={10} className="shrink-0" />
+                                <span>Edit</span>
+                              </button>
+                            )}
                             <MapPin size={16} className="text-[#C5A059] shrink-0 mt-0.5" />
-                            <div className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 pr-6">
                               {/* Scrollable & Wrapping Address Container */}
                               <div className="max-h-24 overflow-y-auto pr-2 custom-scrollbar">
                                 <p className="text-xs text-brand font-medium leading-relaxed italic break-words">
@@ -994,6 +1019,23 @@ export default function AdminOrders() {
           awbNumber={ndrAwb}
           courierRemarks={ndrRemarks}
           onClose={() => setNdrModalOpen(false)}
+          onSuccess={async () => {
+            await fetchOrders();
+          }}
+        />
+      )}
+
+      {activeEditAddressOrderId !== null && activeEditAddressStr !== null && activeEditAddressPhone !== null && (
+        <EditAddressModal
+          isOpen={true}
+          orderId={activeEditAddressOrderId}
+          existingAddress={activeEditAddressStr}
+          customerPhone={activeEditAddressPhone}
+          onClose={() => {
+            setActiveEditAddressOrderId(null);
+            setActiveEditAddressStr(null);
+            setActiveEditAddressPhone(null);
+          }}
           onSuccess={async () => {
             await fetchOrders();
           }}

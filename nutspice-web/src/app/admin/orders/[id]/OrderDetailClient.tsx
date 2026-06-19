@@ -6,6 +6,7 @@ import Link from "next/link";
 import PaymentDetailsCard from "@/components/admin/PaymentDetailsCard";
 import NdrActionModal from "@/components/admin/NdrActionModal";
 import CancelShipmentModal from "@/components/admin/CancelShipmentModal";
+import EditAddressModal from "@/components/admin/EditAddressModal";
 import { 
   ArrowLeft, 
   Clock, 
@@ -17,7 +18,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Info,
-  XCircle
+  XCircle,
+  Pencil
 } from "lucide-react";
 
 interface OrderItem {
@@ -64,6 +66,7 @@ export default function OrderDetailClient({
   const router = useRouter();
   const [ndrModalOpen, setNdrModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
 
   const handleCancelShipment = async () => {
     const res = await fetch(`/api/orders/${order.id}/status`, {
@@ -282,9 +285,25 @@ export default function OrderDetailClient({
           {/* Delivery Address */}
           <div>
             <h4 className="text-[9px] font-black text-brand/30 uppercase tracking-[0.2em] mb-4">Delivery Address</h4>
-            <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs">
+            <div className="flex gap-3.5 p-5 bg-white rounded-2xl border border-brand/5 shadow-xs relative group">
+              {(!order.awbNumber && 
+                order.status?.toLowerCase() !== "cancelled" && 
+                order.orderStatus !== "CANCELLED" && 
+                (order.shippingStatus || "").toUpperCase() !== "3_AWB_GENERATED" && 
+                (order.shippingStatus || "").toUpperCase() !== "4_PICKUP_REQUESTED" && 
+                (order.shippingStatus || "").toUpperCase() !== "DELIVERED") && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddressModalOpen(true)}
+                  className="absolute bottom-5 right-5 flex items-center gap-1 px-2 py-1 rounded-lg border border-[#C5A059]/20 bg-[#C5A059]/5 text-[#C5A059] hover:bg-[#C5A059] hover:text-white transition-all duration-200 cursor-pointer shadow-xs font-bold text-[9px] uppercase tracking-wider"
+                  title="Edit shipping address"
+                >
+                  <Pencil size={10} className="shrink-0" />
+                  <span>Edit</span>
+                </button>
+              )}
               <MapPin size={18} className="text-[#C5A059] shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pr-6">
                 <p className="text-xs text-brand font-medium leading-relaxed italic break-words">
                   "{order.shippingAddress}"
                 </p>
@@ -513,6 +532,20 @@ export default function OrderDetailClient({
           awbNumber={order.awbNumber || ""}
           onClose={() => setCancelModalOpen(false)}
           onConfirm={handleCancelShipment}
+        />
+      )}
+
+      {/* Edit Address Modal Trigger */}
+      {isAddressModalOpen && (
+        <EditAddressModal
+          isOpen={true}
+          orderId={order.id}
+          existingAddress={order.shippingAddress || ""}
+          customerPhone={customerPhone}
+          onClose={() => setIsAddressModalOpen(false)}
+          onSuccess={() => {
+            router.refresh();
+          }}
         />
       )}
     </div>
