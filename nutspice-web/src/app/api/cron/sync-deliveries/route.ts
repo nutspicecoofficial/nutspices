@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         }
 
         const status = trackingRes.status?.toLowerCase() || "";
-        const rawStatus = trackingRes.trackingData?.current_status?.toLowerCase() || "";
+        const rawStatus = (trackingRes.trackingData as any)?.current_status?.toLowerCase() || "";
 
         if (status === "delivered" || rawStatus === "delivered") {
           deliveredIds.push(order.id);
